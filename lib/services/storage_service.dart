@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StorageService {
+  StorageService._();
+  static final instance = StorageService._();
+
   final SupabaseClient _client = Supabase.instance.client;
   static const String _bucket = 'property-images';
 

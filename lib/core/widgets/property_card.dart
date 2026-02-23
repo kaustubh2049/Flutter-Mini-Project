@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/property.dart';
+import '../../services/property_service.dart';
+import '../../providers/property_provider.dart';
 import '../constants/app_colors.dart';
 import '../utils/format_utils.dart';
 
 class PropertyCard extends StatelessWidget {
   final Property property;
   final VoidCallback onTap;
-  final bool isFeatured; // larger card for featured row
+  final bool isFeatured;
 
   const PropertyCard({
     super.key,
@@ -18,23 +21,52 @@ class PropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return isFeatured ? _FeaturedCard(property: property, onTap: onTap)
+    return isFeatured
+        ? _FeaturedCard(property: property, onTap: onTap)
         : _GridCard(property: property, onTap: onTap);
   }
 }
 
-// ── Featured Card (wide, horizontal scroll) ─────────────────────────────────
-class _FeaturedCard extends StatefulWidget {
+// ── Featured Card ─────────────────────────────────────────────────────────────
+class _FeaturedCard extends ConsumerStatefulWidget {
   final Property property;
   final VoidCallback onTap;
   const _FeaturedCard({required this.property, required this.onTap});
 
   @override
-  State<_FeaturedCard> createState() => _FeaturedCardState();
+  ConsumerState<_FeaturedCard> createState() => _FeaturedCardState();
 }
 
-class _FeaturedCardState extends State<_FeaturedCard> {
+class _FeaturedCardState extends ConsumerState<_FeaturedCard> {
   bool _saved = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final s = await PropertyService.instance.isSaved(widget.property.id);
+    if (mounted) setState(() => _saved = s);
+  }
+
+  Future<void> _toggleSave() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      if (_saved) {
+        await PropertyService.instance.unsaveProperty(widget.property.id);
+      } else {
+        await PropertyService.instance.saveProperty(widget.property.id);
+      }
+      setState(() => _saved = !_saved);
+      ref.invalidate(savedPropertiesProvider);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +90,6 @@ class _FeaturedCardState extends State<_FeaturedCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
@@ -73,12 +104,11 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 170,
-                      color: AppColors.surfaceAlt,
+                      decoration: const BoxDecoration(color: AppColors.surfaceAlt),
                       child: const Icon(Icons.home_outlined,
                           size: 48, color: AppColors.textHint),
                     ),
                   ),
-                  // Top row: listing type badge + save button
                   Positioned(
                     top: 12,
                     left: 12,
@@ -93,7 +123,7 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                               : AppColors.buy,
                         ),
                         GestureDetector(
-                          onTap: () => setState(() => _saved = !_saved),
+                          onTap: _toggleSave,
                           child: Container(
                             width: 34,
                             height: 34,
@@ -107,13 +137,21 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                                 ),
                               ],
                             ),
-                            child: Icon(
-                              _saved
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: _saved ? Colors.red : AppColors.textSecondary,
-                              size: 18,
-                            ),
+                            child: _loading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : Icon(
+                                    _saved
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: _saved ? Colors.red : AppColors.textSecondary,
+                                    size: 18,
+                                  ),
                           ),
                         ),
                       ],
@@ -122,14 +160,11 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                 ],
               ),
             ),
-
-            // Info
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Price
                   Row(
                     children: [
                       Text(
@@ -151,27 +186,20 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                       if (p.isVerified)
                         Row(
                           children: [
-                            const Icon(
-                              Icons.verified_rounded,
-                              color: AppColors.verified,
-                              size: 15,
-                            ),
+                            const Icon(Icons.verified_rounded,
+                                color: AppColors.verified, size: 15),
                             const SizedBox(width: 3),
-                            Text(
-                              'Verified',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                color: AppColors.verified,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Text('Verified',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  color: AppColors.verified,
+                                  fontWeight: FontWeight.w600,
+                                )),
                           ],
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
-
-                  // Title
                   Text(
                     p.title,
                     style: GoogleFonts.plusJakartaSans(
@@ -183,15 +211,10 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-
-                  // Locality + area
                   Row(
                     children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 13,
-                        color: AppColors.textSecondary,
-                      ),
+                      const Icon(Icons.location_on_outlined,
+                          size: 13, color: AppColors.textSecondary),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
@@ -207,8 +230,6 @@ class _FeaturedCardState extends State<_FeaturedCard> {
                     ],
                   ),
                   const SizedBox(height: 10),
-
-                  // Chips row
                   Row(
                     children: [
                       _InfoChip(label: FormatUtils.bhkLabel(p.bhk)),
@@ -232,18 +253,46 @@ class _FeaturedCardState extends State<_FeaturedCard> {
   }
 }
 
-// ── Grid Card (smaller, 2-column) ────────────────────────────────────────────
-class _GridCard extends StatefulWidget {
+// ── Grid Card ─────────────────────────────────────────────────────────────────
+class _GridCard extends ConsumerStatefulWidget {
   final Property property;
   final VoidCallback onTap;
   const _GridCard({required this.property, required this.onTap});
 
   @override
-  State<_GridCard> createState() => _GridCardState();
+  ConsumerState<_GridCard> createState() => _GridCardState();
 }
 
-class _GridCardState extends State<_GridCard> {
+class _GridCardState extends ConsumerState<_GridCard> {
   bool _saved = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final s = await PropertyService.instance.isSaved(widget.property.id);
+    if (mounted) setState(() => _saved = s);
+  }
+
+  Future<void> _toggleSave() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      if (_saved) {
+        await PropertyService.instance.unsaveProperty(widget.property.id);
+      } else {
+        await PropertyService.instance.saveProperty(widget.property.id);
+      }
+      setState(() => _saved = !_saved);
+      ref.invalidate(savedPropertiesProvider);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +314,6 @@ class _GridCardState extends State<_GridCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(16)),
@@ -280,7 +328,7 @@ class _GridCardState extends State<_GridCard> {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 120,
-                      color: AppColors.surfaceAlt,
+                      decoration: const BoxDecoration(color: AppColors.surfaceAlt),
                       child: const Icon(Icons.home_outlined,
                           color: AppColors.textHint),
                     ),
@@ -300,7 +348,7 @@ class _GridCardState extends State<_GridCard> {
                     top: 6,
                     right: 6,
                     child: GestureDetector(
-                      onTap: () => setState(() => _saved = !_saved),
+                      onTap: _toggleSave,
                       child: Container(
                         width: 28,
                         height: 28,
@@ -314,20 +362,27 @@ class _GridCardState extends State<_GridCard> {
                             ),
                           ],
                         ),
-                        child: Icon(
-                          _saved
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          size: 14,
-                          color: _saved ? Colors.red : AppColors.textSecondary,
-                        ),
+                        child: _loading
+                            ? const Padding(
+                                padding: EdgeInsets.all(6),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : Icon(
+                                _saved
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                size: 14,
+                                color: _saved ? Colors.red : AppColors.textSecondary,
+                              ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
@@ -352,11 +407,8 @@ class _GridCardState extends State<_GridCard> {
                       ),
                       if (p.isVerified) ...[
                         const Spacer(),
-                        const Icon(
-                          Icons.verified_rounded,
-                          color: AppColors.verified,
-                          size: 13,
-                        ),
+                        const Icon(Icons.verified_rounded,
+                            color: AppColors.verified, size: 13),
                       ],
                     ],
                   ),
@@ -374,11 +426,8 @@ class _GridCardState extends State<_GridCard> {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 11,
-                        color: AppColors.textSecondary,
-                      ),
+                      const Icon(Icons.location_on_outlined,
+                          size: 11, color: AppColors.textSecondary),
                       Expanded(
                         child: Text(
                           '${p.locality}, ${p.city}',

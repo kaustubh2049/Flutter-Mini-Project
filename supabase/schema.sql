@@ -47,7 +47,7 @@ CREATE TABLE public.properties (
 
     -- Core details
     title         TEXT        NOT NULL,
-    type          TEXT        NOT NULL CHECK (type IN ('Apartment','Villa','PG','Plot','House','Office')),
+    type          TEXT        NOT NULL CHECK (type IN ('Apartment','Villa','PG','Plot','House','Office','Commercial')),
     listing_type  TEXT        NOT NULL CHECK (listing_type IN ('Rent','Buy')),
     bhk           INT         CHECK (bhk BETWEEN 1 AND 10),
     price         NUMERIC     NOT NULL,            -- rent/month or sale price in ₹
@@ -87,6 +87,36 @@ CREATE TABLE public.saved_properties (
     saved_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     UNIQUE (user_id, property_id)
 );
+
+-- ─────────────────────────────────────────────────────────────
+--  PROPERTY INTERESTS
+--  Buyer taps "I'm Interested" → record inserted here
+--  Seller can count how many buyers expressed interest
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE public.property_interests (
+    id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+    property_id UUID        REFERENCES public.properties(id) ON DELETE CASCADE NOT NULL,
+    user_id     UUID        REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE (property_id, user_id)
+);
+
+ALTER TABLE public.property_interests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Buyers view own interests"
+    ON public.property_interests FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Sellers see interests on their properties"
+    ON public.property_interests FOR SELECT
+    USING (
+        property_id IN (SELECT id FROM public.properties WHERE owner_id = auth.uid())
+    );
+
+CREATE POLICY "Buyers express interest"
+    ON public.property_interests FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Buyers withdraw interest"
+    ON public.property_interests FOR DELETE USING (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────
 --  ROW LEVEL SECURITY

@@ -1,5 +1,6 @@
 class Property {
   final String id;
+  final String? ownerId;   // Supabase auth user id of the poster
   final String title;
   final String type;
   final String listingType; // 'Rent' | 'Buy'
@@ -8,6 +9,7 @@ class Property {
   final double? area;
   final String locality;
   final String city;
+  final String? state;
   final String? floor;
   final String? description;
   final List<String> amenities;
@@ -16,10 +18,12 @@ class Property {
   final String ownerPhone;
   final bool isVerified;
   final bool isFeatured;
+  final bool isActive;
   final DateTime postedAt;
 
   const Property({
     required this.id,
+    this.ownerId,
     required this.title,
     required this.type,
     required this.listingType,
@@ -28,6 +32,7 @@ class Property {
     this.area,
     required this.locality,
     required this.city,
+    this.state,
     this.floor,
     this.description,
     this.amenities = const [],
@@ -36,12 +41,14 @@ class Property {
     required this.ownerPhone,
     this.isVerified = false,
     this.isFeatured = false,
+    this.isActive = true,
     required this.postedAt,
   });
 
   factory Property.fromMap(Map<String, dynamic> map) {
     return Property(
       id: map['id'] ?? '',
+      ownerId: map['owner_id'],
       title: map['title'] ?? '',
       type: map['type'] ?? 'Apartment',
       listingType: map['listing_type'] ?? 'Rent',
@@ -50,6 +57,7 @@ class Property {
       area: map['area'] != null ? (map['area'] as num).toDouble() : null,
       locality: map['locality'] ?? '',
       city: map['city'] ?? '',
+      state: map['state'],
       floor: map['floor'],
       description: map['description'],
       amenities: List<String>.from(map['amenities'] ?? []),
@@ -58,6 +66,7 @@ class Property {
       ownerPhone: map['owner_phone'] ?? '',
       isVerified: map['is_verified'] ?? false,
       isFeatured: map['is_featured'] ?? false,
+      isActive: map['is_active'] ?? true,
       postedAt: DateTime.parse(
         map['posted_at'] ?? DateTime.now().toIso8601String(),
       ),

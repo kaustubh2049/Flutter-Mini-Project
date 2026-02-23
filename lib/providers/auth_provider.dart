@@ -4,7 +4,7 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 
 final storageServiceProvider =
-    Provider<StorageService>((ref) => StorageService());
+    Provider<StorageService>((ref) => StorageService.instance);
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
