@@ -7,6 +7,7 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/add_property/add_property_screen.dart';
 
 // Notifier that rebuilds the router when auth state changes
 class _AuthChangeNotifier extends ChangeNotifier {
@@ -39,6 +40,7 @@ final _router = GoRouter(
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
     GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+    GoRoute(path: '/add-property', builder: (_, __) => const AddPropertyScreen()),
   ],
 );
 
