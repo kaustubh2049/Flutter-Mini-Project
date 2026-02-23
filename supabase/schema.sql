@@ -1,0 +1,168 @@
+-- ============================================================
+--  PropVista – Supabase Database Schema
+--  Run this entire file in: Supabase Dashboard → SQL Editor
+-- ============================================================
+
+-- Extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ─────────────────────────────────────────────────────────────
+--  PROFILES (extends auth.users – auto-created via trigger)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE public.profiles (
+    id          UUID        REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    name        TEXT,
+    email       TEXT,
+    phone       TEXT,
+    avatar_url  TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Trigger: auto-create profile when a user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO public.profiles (id, name, email, phone)
+    VALUES (
+        NEW.id,
+        NEW.raw_user_meta_data ->> 'name',
+        NEW.email,
+        NEW.raw_user_meta_data ->> 'phone'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ─────────────────────────────────────────────────────────────
+--  PROPERTIES
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE public.properties (
+    id            UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+    owner_id      UUID        REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+
+    -- Core details
+    title         TEXT        NOT NULL,
+    type          TEXT        NOT NULL CHECK (type IN ('Apartment','Villa','PG','Plot','House','Office')),
+    listing_type  TEXT        NOT NULL CHECK (listing_type IN ('Rent','Buy')),
+    bhk           INT         CHECK (bhk BETWEEN 1 AND 10),
+    price         NUMERIC     NOT NULL,            -- rent/month or sale price in ₹
+    area          NUMERIC,                          -- sq. ft.
+    floor         TEXT,
+
+    -- Location (locality-first, Indian convention)
+    locality      TEXT        NOT NULL,
+    city          TEXT        NOT NULL,
+    state         TEXT,
+
+    -- Content
+    description   TEXT,
+    amenities     TEXT[]      DEFAULT '{}',
+    image_urls    TEXT[]      DEFAULT '{}',        -- Firebase / Supabase Storage URLs
+
+    -- Owner contact (denormalised for speed)
+    owner_name    TEXT,
+    owner_phone   TEXT,                            -- used for WhatsApp deep link
+
+    -- Flags
+    is_verified   BOOLEAN     DEFAULT FALSE,
+    is_featured   BOOLEAN     DEFAULT FALSE,
+    is_active     BOOLEAN     DEFAULT TRUE,
+
+    posted_at     TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- ─────────────────────────────────────────────────────────────
+--  SAVED / BOOKMARKED PROPERTIES
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE public.saved_properties (
+    id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id     UUID        REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    property_id UUID        REFERENCES public.properties(id) ON DELETE CASCADE NOT NULL,
+    saved_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE (user_id, property_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+--  ROW LEVEL SECURITY
+-- ─────────────────────────────────────────────────────────────
+
+-- Profiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own profile"
+    ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile"
+    ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Properties
+ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can browse active listings"
+    ON public.properties FOR SELECT USING (is_active = TRUE);
+CREATE POLICY "Authenticated users can post listings"
+    ON public.properties FOR INSERT WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Owners can edit their listings"
+    ON public.properties FOR UPDATE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can delete their listings"
+    ON public.properties FOR DELETE USING (auth.uid() = owner_id);
+
+-- Saved Properties
+ALTER TABLE public.saved_properties ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own saved"
+    ON public.saved_properties FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can save a property"
+    ON public.saved_properties FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unsave a property"
+    ON public.saved_properties FOR DELETE USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+--  STORAGE BUCKET  (property images – public)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('property-images', 'property-images', TRUE)
+ON CONFLICT DO NOTHING;
+
+CREATE POLICY "Anyone can view property images"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'property-images');
+
+CREATE POLICY "Authenticated users can upload"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'property-images' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Owners can delete their images"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'property-images'
+           AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ─────────────────────────────────────────────────────────────
+--  PERFORMANCE INDEXES
+-- ─────────────────────────────────────────────────────────────
+CREATE INDEX idx_properties_listing_type ON public.properties(listing_type);
+CREATE INDEX idx_properties_city         ON public.properties(city);
+CREATE INDEX idx_properties_locality     ON public.properties(locality);
+CREATE INDEX idx_properties_owner_id     ON public.properties(owner_id);
+CREATE INDEX idx_properties_posted_at    ON public.properties(posted_at DESC);
+CREATE INDEX idx_properties_is_featured  ON public.properties(is_featured) WHERE is_featured = TRUE;
+CREATE INDEX idx_saved_user_id           ON public.saved_properties(user_id);
+
+-- ─────────────────────────────────────────────────────────────
+--  SEED DATA (optional demo listings – remove before production)
+-- ─────────────────────────────────────────────────────────────
+-- INSERT INTO public.properties (owner_id, title, type, listing_type, bhk, price,
+--   area, locality, city, state, description, owner_name, owner_phone,
+--   is_verified, is_featured, image_urls)
+-- VALUES (
+--   '<your-auth-user-id>',
+--   '3 BHK Apartment in Koramangala',
+--   'Apartment', 'Rent', 3, 35000,
+--   1450, 'Koramangala', 'Bangalore', 'Karnataka',
+--   'Spacious 3BHK with modular kitchen, gym, and 24x7 security.',
+--   'Rahul Sharma', '9876543210',
+--   TRUE, TRUE,
+--   ARRAY['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800']
+-- );
