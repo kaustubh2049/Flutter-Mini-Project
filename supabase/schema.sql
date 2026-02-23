@@ -181,6 +181,44 @@ CREATE INDEX idx_properties_is_featured  ON public.properties(is_featured) WHERE
 CREATE INDEX idx_saved_user_id           ON public.saved_properties(user_id);
 
 -- ─────────────────────────────────────────────────────────────
+--  VISIT REQUESTS
+--  Buyer taps "Schedule Visit" → record inserted here
+--  Seller can see all visit requests on their properties
+--  User info is denormalised so sellers can see details without
+--  needing cross-profile SELECT (which RLS would block).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.visit_requests (
+    id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+    property_id UUID        REFERENCES public.properties(id) ON DELETE CASCADE NOT NULL,
+    user_id     UUID        REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_name   TEXT,
+    user_phone  TEXT,
+    user_email  TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE (property_id, user_id)
+);
+
+ALTER TABLE public.visit_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Buyers can request visits"
+    ON public.visit_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Buyers view own requests"
+    ON public.visit_requests FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Sellers see visit requests on their properties"
+    ON public.visit_requests FOR SELECT
+    USING (
+        property_id IN (SELECT id FROM public.properties WHERE owner_id = auth.uid())
+    );
+
+CREATE POLICY "Buyers withdraw visit requests"
+    ON public.visit_requests FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX idx_visit_requests_property_id ON public.visit_requests(property_id);
+CREATE INDEX idx_visit_requests_user_id     ON public.visit_requests(user_id);
+
+-- ─────────────────────────────────────────────────────────────
 --  SEED DATA (optional demo listings – remove before production)
 -- ─────────────────────────────────────────────────────────────
 -- INSERT INTO public.properties (owner_id, title, type, listing_type, bhk, price,

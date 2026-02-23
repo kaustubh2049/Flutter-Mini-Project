@@ -58,8 +58,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-
-
   Widget _buildBottomNav() {
     return BottomAppBar(
       color: Colors.white,
@@ -106,7 +104,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
-
 
 // ── Nav Item ─────────────────────────────────────────────────────────────────
 class _NavItem extends StatelessWidget {
@@ -181,7 +178,8 @@ class _SavedTab extends ConsumerWidget {
               const Spacer(),
               savedAsync.maybeWhen(
                 data: (list) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
@@ -213,7 +211,8 @@ class _SavedTab extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.textHint),
+                  const Icon(Icons.wifi_off_rounded,
+                      size: 48, color: AppColors.textHint),
                   const SizedBox(height: 12),
                   Text('Failed to load saved properties',
                       style: GoogleFonts.inter(color: AppColors.textSecondary)),
@@ -261,7 +260,8 @@ class _EmptySaved extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 90, height: 90,
+            width: 90,
+            height: 90,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.07),
               shape: BoxShape.circle,
@@ -272,13 +272,15 @@ class _EmptySaved extends StatelessWidget {
           const SizedBox(height: 20),
           Text('No saved properties yet',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 18, fontWeight: FontWeight.w700,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               )),
           const SizedBox(height: 8),
           Text('Tap the ♡ on any listing to save it here',
               style: GoogleFonts.inter(
-                fontSize: 13, color: AppColors.textSecondary,
+                fontSize: 13,
+                color: AppColors.textSecondary,
               )),
         ],
       ),
@@ -294,143 +296,168 @@ class _SavedPropertyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = property;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12, offset: const Offset(0, 4),
+    return GestureDetector(
+        onTap: () => context.push('/property-detail', extra: p),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Stack(
-              children: [
-                Image.network(
-                  p.imageUrls.isNotEmpty
-                      ? p.imageUrls.first
-                      : 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800',
-                  height: 180, width: double.infinity, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 180,
-                    decoration: const BoxDecoration(color: AppColors.surfaceAlt),
-                    child: const Icon(Icons.home_outlined,
-                        size: 48, color: AppColors.textHint),
-                  ),
-                ),
-                Positioned(
-                  top: 12, left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: p.listingType == 'Rent' ? AppColors.rent : AppColors.buy,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(p.listingType,
-                        style: GoogleFonts.inter(
-                          fontSize: 11, fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        )),
-                  ),
-                ),
-                Positioned(
-                  top: 10, right: 10,
-                  child: GestureDetector(
-                    onTap: onUnsave,
-                    child: Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6)
-                        ],
-                      ),
-                      child: const Icon(Icons.favorite_rounded,
-                          color: Colors.red, size: 18),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
                   children: [
-                    Text(FormatUtils.formatPrice(p.price),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18, fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        )),
-                    Text(FormatUtils.priceSuffix(p.listingType),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13, color: AppColors.textSecondary,
-                        )),
-                    const Spacer(),
-                    if (p.isVerified)
-                      Row(children: [
-                        const Icon(Icons.verified_rounded,
-                            color: AppColors.verified, size: 15),
-                        const SizedBox(width: 3),
-                        Text('Verified',
+                    Image.network(
+                      p.imageUrls.isNotEmpty
+                          ? p.imageUrls.first
+                          : 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800',
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 180,
+                        decoration:
+                            const BoxDecoration(color: AppColors.surfaceAlt),
+                        child: const Icon(Icons.home_outlined,
+                            size: 48, color: AppColors.textHint),
+                      ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: p.listingType == 'Rent'
+                              ? AppColors.rent
+                              : AppColors.buy,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(p.listingType,
                             style: GoogleFonts.inter(
-                              fontSize: 11, color: AppColors.verified,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             )),
-                      ]),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(p.title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 13, color: AppColors.textSecondary),
-                    const SizedBox(width: 2),
-                    Expanded(
-                      child: Text('${p.locality}, ${p.city}',
-                          style: GoogleFonts.inter(
-                            fontSize: 12, color: AppColors.textSecondary,
-                          ),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(FormatUtils.bhkLabel(p.bhk),
-                          style: GoogleFonts.inter(
-                            fontSize: 11, fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          )),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: GestureDetector(
+                        onTap: onUnsave,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.12),
+                                  blurRadius: 6)
+                            ],
+                          ),
+                          child: const Icon(Icons.favorite_rounded,
+                              color: Colors.red, size: 18),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(FormatUtils.formatPrice(p.price),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            )),
+                        Text(FormatUtils.priceSuffix(p.listingType),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            )),
+                        const Spacer(),
+                        if (p.isVerified)
+                          Row(children: [
+                            const Icon(Icons.verified_rounded,
+                                color: AppColors.verified, size: 15),
+                            const SizedBox(width: 3),
+                            Text('Verified',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppColors.verified,
+                                  fontWeight: FontWeight.w600,
+                                )),
+                          ]),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(p.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined,
+                            size: 13, color: AppColors.textSecondary),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text('${p.locality}, ${p.city}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceAlt,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(FormatUtils.bhkLabel(p.bhk),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              )),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 }
 
@@ -450,7 +477,7 @@ class _ProfileTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = Supabase.instance.client.auth.currentUser;
-    final name  = user?.userMetadata?['name'] as String? ?? 'User';
+    final name = user?.userMetadata?['name'] as String? ?? 'User';
     final email = user?.email ?? '';
     final myListingsAsync = ref.watch(myListingsProvider);
 
@@ -460,9 +487,10 @@ class _ProfileTab extends ConsumerWidget {
         children: [
           // Avatar
           Container(
-            width: 80, height: 80,
+            width: 80,
+            height: 80,
             decoration: const BoxDecoration(
-              color: AppColors.primary, shape: BoxShape.circle),
+                color: AppColors.primary, shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : 'U',
@@ -501,40 +529,42 @@ class _ProfileTab extends ConsumerWidget {
                 return _EmptyEstate(onAdd: () => context.push('/add-property'));
               }
               return Column(
-                children: listings.map((p) => _MyListingCard(property: p)).toList(),
+                children:
+                    listings.map((p) => _MyListingCard(property: p)).toList(),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => _EmptyEstate(
-                onAdd: () => context.push('/add-property')),
+            error: (_, __) =>
+                _EmptyEstate(onAdd: () => context.push('/add-property')),
           ),
           const SizedBox(height: 28),
 
           // ── Menu ─────────────────────────────────────────────────────
           ..._menuItems.map((item) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: ListTile(
-              leading: Container(
-                width: 40, height: 40,
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: item.color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.divider),
                 ),
-                child: Icon(item.icon, color: item.color, size: 20),
-              ),
-              title: Text(item.title,
-                  style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600, fontSize: 14)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppColors.textSecondary),
-              onTap: () {},
-            ),
-          )),
+                child: ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: item.color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(item.icon, color: item.color, size: 20),
+                  ),
+                  title: Text(item.title,
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                      size: 14, color: AppColors.textSecondary),
+                  onTap: () {},
+                ),
+              )),
           const SizedBox(height: 8),
 
           // Logout
@@ -582,99 +612,138 @@ class _MyListingCard extends StatelessWidget {
     final p = property;
     final img = p.imageUrls.isNotEmpty ? p.imageUrls.first : null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: img != null
-                ? Image.network(img, width: 90, height: 90, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(width: 90, height: 90, color: AppColors.surfaceAlt))
-                : Container(
-                    width: 90, height: 90, color: AppColors.surfaceAlt,
-                    child: const Icon(Icons.home, color: AppColors.textHint)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () => context.push('/property-inquiries', extra: p),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Text(p.title,
-                    style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text(FormatUtils.formatPrice(p.price),
-                    style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text('${p.locality}, ${p.city}',
-                    style: GoogleFonts.inter(
-                        fontSize: 11, color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: p.isActive
-                            ? AppColors.success.withOpacity(0.1)
-                            : AppColors.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: img != null
+                      ? Image.network(img,
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                              width: 90,
+                              height: 90,
+                              color: AppColors.surfaceAlt))
+                      : Container(
+                          width: 90,
+                          height: 90,
+                          color: AppColors.surfaceAlt,
+                          child: const Icon(Icons.home,
+                              color: AppColors.textHint)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.title,
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text(FormatUtils.formatPrice(p.price),
+                          style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text('${p.locality}, ${p.city}',
+                          style: GoogleFonts.inter(
+                              fontSize: 11, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: p.isActive
+                                  ? AppColors.success.withOpacity(0.1)
+                                  : AppColors.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              p.isActive ? 'Active' : 'Inactive',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: p.isActive
+                                    ? AppColors.success
+                                    : AppColors.error,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              p.listingType,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        p.isActive ? 'Active' : 'Inactive',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: p.isActive ? AppColors.success : AppColors.error,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.07),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        p.listingType,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            // ── View Inquiries footer ──────────────────────────────────────
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: AppColors.divider),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 13, color: AppColors.accent),
+                const SizedBox(width: 5),
+                Text(
+                  'View Visit Requests',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    size: 11, color: AppColors.textHint),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -693,7 +762,8 @@ class _EmptyEstate extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.04),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.12),
+        border: Border.all(
+            color: AppColors.primary.withOpacity(0.12),
             style: BorderStyle.solid),
       ),
       child: Column(
@@ -744,7 +814,8 @@ class _MenuItem {
 const _menuItems = [
   _MenuItem(Icons.person_outline_rounded, 'Edit Profile', Color(0xFF8B5CF6)),
   _MenuItem(Icons.help_outline_rounded, 'Help & Support', AppColors.success),
-  _MenuItem(Icons.privacy_tip_outlined, 'Privacy Policy', AppColors.textSecondary),
+  _MenuItem(
+      Icons.privacy_tip_outlined, 'Privacy Policy', AppColors.textSecondary),
 ];
 
 // ── Placeholder Tab ───────────────────────────────────────────────────────────
@@ -760,7 +831,8 @@ class _PlaceholderTab extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 70, height: 70,
+            width: 70,
+            height: 70,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.06),
               shape: BoxShape.circle,
@@ -775,8 +847,7 @@ class _PlaceholderTab extends StatelessWidget {
                   color: AppColors.textPrimary)),
           const SizedBox(height: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.06),
               borderRadius: BorderRadius.circular(30),

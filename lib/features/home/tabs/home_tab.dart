@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/property.dart';
@@ -66,7 +67,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             ),
           ),
         ),
-
       ],
     );
   }
@@ -81,7 +81,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           Expanded(
             child: Row(
               children: [
-                const Icon(Icons.location_on, color: AppColors.accent, size: 24),
+                const Icon(Icons.location_on,
+                    color: AppColors.accent, size: 24),
                 const SizedBox(width: 6),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,8 +223,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             onTap: () => setState(() => _activeCategoryIndex = i),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: isActive ? AppColors.accent : AppColors.surfaceAlt,
                 borderRadius: BorderRadius.circular(100),
@@ -267,11 +267,16 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
   IconData _catIcon(String name) {
     switch (name) {
-      case 'apartment':  return Icons.apartment_rounded;
-      case 'home':       return Icons.home_rounded;
-      case 'storefront': return Icons.storefront_rounded;
-      case 'villa':      return Icons.villa_rounded;
-      default:           return Icons.home_rounded;
+      case 'apartment':
+        return Icons.apartment_rounded;
+      case 'home':
+        return Icons.home_rounded;
+      case 'storefront':
+        return Icons.storefront_rounded;
+      case 'villa':
+        return Icons.villa_rounded;
+      default:
+        return Icons.home_rounded;
     }
   }
 
@@ -453,143 +458,178 @@ class _PropertyFeaturedCard extends StatefulWidget {
 
 class _PropertyFeaturedCardState extends State<_PropertyFeaturedCard> {
   bool _saved = false;
+  bool _saveLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final s = await PropertyService.instance.isSaved(widget.property.id);
+    if (mounted) setState(() => _saved = s);
+  }
+
+  Future<void> _toggleSave() async {
+    if (_saveLoading) return;
+    setState(() => _saveLoading = true);
+    try {
+      if (_saved) {
+        await PropertyService.instance.unsaveProperty(widget.property.id);
+      } else {
+        await PropertyService.instance.saveProperty(widget.property.id);
+      }
+      setState(() => _saved = !_saved);
+    } finally {
+      if (mounted) setState(() => _saveLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = widget.property;
     final img = p.imageUrls.isNotEmpty ? p.imageUrls.first : null;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: SizedBox(
-        height: 256,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            img != null
-                ? Image.network(img, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _placeholder())
-                : _placeholder(),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.8),
-                  ],
-                  stops: const [0.0, 0.35, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  p.listingType.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ),
-            if (p.isVerified)
-              Positioned(
-                top: 12,
-                left: 80,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return GestureDetector(
+        onTap: () => context.push('/property-detail', extra: p),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 256,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                img != null
+                    ? Image.network(img,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder())
+                    : _placeholder(),
+                Container(
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '✓ VERIFIED',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.6,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.2),
+                        Colors.black.withOpacity(0.8),
+                      ],
+                      stops: const [0.0, 0.35, 1.0],
                     ),
                   ),
                 ),
-              ),
-            Positioned(
-              top: 10, right: 10,
-              child: GestureDetector(
-                onTap: () => setState(() => _saved = !_saved),
-                child: Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _saved
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: Colors.white, size: 18,
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      p.listingType.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              bottom: 0, left: 0, right: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      FormatUtils.formatPrice(p.price),
-                      style: GoogleFonts.inter(
-                          fontSize: 22,
+                if (p.isVerified)
+                  Positioned(
+                    top: 12,
+                    left: 80,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '✓ VERIFIED',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white),
+                          color: Colors.white,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      p.title,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.88)),
+                  ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: _toggleSave,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _saved
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: _saved ? Colors.red : Colors.white,
+                        size: 18,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.location_on,
-                            size: 14, color: Colors.white60),
-                        const SizedBox(width: 3),
                         Text(
-                          '${p.locality}, ${p.city}',
+                          FormatUtils.formatPrice(p.price),
                           style: GoogleFonts.inter(
-                              fontSize: 11, color: Colors.white60),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          p.title,
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.88)),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on,
+                                size: 14, color: Colors.white60),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${p.locality}, ${p.city}',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11, color: Colors.white60),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 
   Widget _placeholder() => Container(
@@ -630,7 +670,8 @@ class _StaticFeaturedCardState extends State<_StaticFeaturedCard> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(widget.imageUrl, fit: BoxFit.cover,
+            Image.network(widget.imageUrl,
+                fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
                     Container(color: AppColors.surfaceAlt)),
             Container(
@@ -648,10 +689,10 @@ class _StaticFeaturedCardState extends State<_StaticFeaturedCard> {
               ),
             ),
             Positioned(
-              top: 12, left: 12,
+              top: 12,
+              left: 12,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(6),
@@ -668,11 +709,13 @@ class _StaticFeaturedCardState extends State<_StaticFeaturedCard> {
               ),
             ),
             Positioned(
-              top: 10, right: 10,
+              top: 10,
+              right: 10,
               child: GestureDetector(
                 onTap: () => setState(() => _saved = !_saved),
                 child: Container(
-                  width: 34, height: 34,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
@@ -681,13 +724,16 @@ class _StaticFeaturedCardState extends State<_StaticFeaturedCard> {
                     _saved
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
-                    color: Colors.white, size: 18,
+                    color: Colors.white,
+                    size: 18,
                   ),
                 ),
               ),
             ),
             Positioned(
-              bottom: 0, left: 0, right: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -738,162 +784,195 @@ class _PropertyListItem extends StatefulWidget {
 
 class _PropertyListItemState extends State<_PropertyListItem> {
   bool _saved = false;
+  bool _saveLoading = false;
   bool _interested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final s = await PropertyService.instance.isSaved(widget.property.id);
+    if (mounted) setState(() => _saved = s);
+  }
+
+  Future<void> _toggleSave() async {
+    if (_saveLoading) return;
+    setState(() => _saveLoading = true);
+    try {
+      if (_saved) {
+        await PropertyService.instance.unsaveProperty(widget.property.id);
+      } else {
+        await PropertyService.instance.saveProperty(widget.property.id);
+      }
+      setState(() => _saved = !_saved);
+    } finally {
+      if (mounted) setState(() => _saveLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = widget.property;
     final img = p.imageUrls.isNotEmpty ? p.imageUrls.first : null;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+        onTap: () => context.push('/property-detail', extra: p),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              children: [
-                img != null
-                    ? Image.network(img,
-                        width: 110, height: 110, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    img != null
+                        ? Image.network(img,
+                            width: 110,
+                            height: 110,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
                                 width: 110,
                                 height: 110,
                                 color: AppColors.surfaceAlt))
-                    : Container(
-                        width: 110,
-                        height: 110,
-                        color: AppColors.surfaceAlt,
-                        child: const Icon(Icons.home,
-                            size: 40, color: AppColors.textHint)),
-                Positioned(
-                  top: 6, left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: p.listingType == 'Rent'
-                          ? AppColors.rent
-                          : AppColors.buy,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      p.listingType,
-                      style: GoogleFonts.inter(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        FormatUtils.formatPrice(p.price),
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                        : Container(
+                            width: 110,
+                            height: 110,
+                            color: AppColors.surfaceAlt,
+                            child: const Icon(Icons.home,
+                                size: 40, color: AppColors.textHint)),
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: p.listingType == 'Rent'
+                              ? AppColors.rent
+                              : AppColors.buy,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _saved = !_saved),
-                      child: Icon(
-                        _saved
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                        color: _saved ? AppColors.accent : AppColors.textSecondary,
-                        size: 22,
+                        child: Text(
+                          p.listingType,
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  FormatUtils.bhkLabel(p.bhk),
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary.withOpacity(0.75),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${p.locality}, ${p.city}',
-                  style: GoogleFonts.inter(
-                      fontSize: 11, color: AppColors.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                // I'm Interested button
-                GestureDetector(
-                  onTap: () async {
-                    await PropertyService.instance.expressInterest(p.id);
-                    setState(() => _interested = true);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: _interested
-                          ? AppColors.success.withOpacity(0.1)
-                          : AppColors.primary.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(7),
-                      border: Border.all(
-                        color: _interested
-                            ? AppColors.success
-                            : AppColors.primary.withOpacity(0.3),
-                      ),
+              ),
+              const SizedBox(width: 12),
+
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            FormatUtils.formatPrice(p.price),
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _toggleSave,
+                          child: Icon(
+                            _saved
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_border_rounded,
+                            color: _saved
+                                ? AppColors.accent
+                                : AppColors.textSecondary,
+                            size: 22,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      _interested ? '✓ Interested' : "I'm Interested",
+                    const SizedBox(height: 2),
+                    Text(
+                      FormatUtils.bhkLabel(p.bhk),
                       style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _interested
-                            ? AppColors.success
-                            : AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary.withOpacity(0.75),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p.locality}, ${p.city}',
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: AppColors.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    // I'm Interested button
+                    GestureDetector(
+                      onTap: () async {
+                        await PropertyService.instance.expressInterest(p.id);
+                        setState(() => _interested = true);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _interested
+                              ? AppColors.success.withOpacity(0.1)
+                              : AppColors.primary.withOpacity(0.07),
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(
+                            color: _interested
+                                ? AppColors.success
+                                : AppColors.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _interested ? '✓ Interested' : "I'm Interested",
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _interested
+                                ? AppColors.success
+                                : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 }
 
@@ -951,14 +1030,15 @@ class _MockListingItemState extends State<_MockListingItem> {
             child: Stack(
               children: [
                 Image.network(m.imageUrl,
-                    width: 110, height: 110, fit: BoxFit.cover,
+                    width: 110,
+                    height: 110,
+                    fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                        width: 110,
-                        height: 110,
-                        color: AppColors.surfaceAlt)),
+                        width: 110, height: 110, color: AppColors.surfaceAlt)),
                 if (m.badge != null)
                   Positioned(
-                    top: 6, left: 6,
+                    top: 6,
+                    left: 6,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
@@ -999,9 +1079,8 @@ class _MockListingItemState extends State<_MockListingItem> {
                         _saved
                             ? Icons.bookmark_rounded
                             : Icons.bookmark_border_rounded,
-                        color: _saved
-                            ? AppColors.accent
-                            : AppColors.textSecondary,
+                        color:
+                            _saved ? AppColors.accent : AppColors.textSecondary,
                         size: 22,
                       ),
                     ),

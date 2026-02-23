@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/inquiry.dart';
 import '../models/property.dart';
 import '../services/property_service.dart';
 
@@ -28,4 +29,9 @@ final savedIdsProvider = FutureProvider<Set<String>>(
     final saved = await PropertyService.instance.fetchSavedProperties();
     return saved.map((p) => p.id).toSet();
   },
+);
+// ── Visit requests / inquiries for a property (seller view) ──────────────
+final propertyInquiriesProvider = FutureProvider.family<List<Inquiry>, String>(
+  (ref, propertyId) =>
+      PropertyService.instance.fetchPropertyInquiries(propertyId),
 );

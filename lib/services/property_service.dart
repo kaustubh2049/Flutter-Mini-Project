@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/inquiry.dart';
 import '../models/property.dart';
 import 'storage_service.dart';
 
@@ -7,7 +8,7 @@ class PropertyService {
   PropertyService._();
   static final instance = PropertyService._();
 
-  final _db      = Supabase.instance.client;
+  final _db = Supabase.instance.client;
   final _storage = StorageService.instance;
 
   // ── Fetch home feed (excludes own listings) ──────────────────────────────
@@ -18,10 +19,7 @@ class PropertyService {
   }) async {
     final uid = _db.auth.currentUser?.id;
 
-    var query = _db
-        .from('properties')
-        .select()
-        .eq('is_active', true);
+    var query = _db.from('properties').select().eq('is_active', true);
 
     // Exclude own posts
     if (uid != null) {
@@ -36,9 +34,7 @@ class PropertyService {
       query = query.ilike('city', '%$city%');
     }
 
-    final data = await query
-        .order('posted_at', ascending: false)
-        .limit(limit);
+    final data = await query.order('posted_at', ascending: false).limit(limit);
 
     return (data as List).map((m) => Property.fromMap(m)).toList();
   }
@@ -111,32 +107,28 @@ class PropertyService {
         .maybeSingle();
 
     final row = {
-      'owner_id'     : uid,
-      'title'        : title,
-      'type'         : type,
-      'listing_type' : listingType,
-      'price'        : price,
-      'bhk'          : bhk,
-      'area'         : area,
-      'locality'     : locality,
-      'city'         : city,
-      'state'        : state,
-      'floor'        : floor,
-      'description'  : description,
-      'amenities'    : amenities,
-      'image_urls'   : imageUrls,
-      'owner_name'   : ownerName ?? profile?['name'] ?? '',
-      'owner_phone'  : ownerPhone ?? profile?['phone'] ?? '',
-      'is_active'    : true,
-      'is_featured'  : false,
-      'is_verified'  : false,
+      'owner_id': uid,
+      'title': title,
+      'type': type,
+      'listing_type': listingType,
+      'price': price,
+      'bhk': bhk,
+      'area': area,
+      'locality': locality,
+      'city': city,
+      'state': state,
+      'floor': floor,
+      'description': description,
+      'amenities': amenities,
+      'image_urls': imageUrls,
+      'owner_name': ownerName ?? profile?['name'] ?? '',
+      'owner_phone': ownerPhone ?? profile?['phone'] ?? '',
+      'is_active': true,
+      'is_featured': false,
+      'is_verified': false,
     };
 
-    final result = await _db
-        .from('properties')
-        .insert(row)
-        .select()
-        .single();
+    final result = await _db.from('properties').insert(row).select().single();
 
     return Property.fromMap(result);
   }
@@ -145,8 +137,7 @@ class PropertyService {
   Future<void> deactivateProperty(String propertyId) async {
     await _db
         .from('properties')
-        .update({'is_active': false})
-        .eq('id', propertyId);
+        .update({'is_active': false}).eq('id', propertyId);
   }
 
   // ── Express interest ─────────────────────────────────────────────────────
@@ -154,9 +145,19 @@ class PropertyService {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
 
+    final profile = await _db
+        .from('profiles')
+        .select('name, phone, email')
+        .eq('id', uid)
+        .maybeSingle();
+
     await _db.from('property_interests').upsert({
       'property_id': propertyId,
-      'user_id'    : uid,
+      'user_id': uid,
+      'user_name':
+          profile?['name'] ?? _db.auth.currentUser?.userMetadata?['name'] ?? '',
+      'user_phone': profile?['phone'] ?? '',
+      'user_email': profile?['email'] ?? _db.auth.currentUser?.email ?? '',
     }, onConflict: 'property_id,user_id');
   }
 
@@ -169,12 +170,56 @@ class PropertyService {
     return (result as List).length;
   }
 
+  // ── Request a visit (buyer side) ─────────────────────────────────────────
+  Future<void> requestVisit(String propertyId) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return;
+
+    final profile = await _db
+        .from('profiles')
+        .select('name, phone, email')
+        .eq('id', uid)
+        .maybeSingle();
+
+    await _db.from('visit_requests').upsert({
+      'property_id': propertyId,
+      'user_id': uid,
+      'user_name':
+          profile?['name'] ?? _db.auth.currentUser?.userMetadata?['name'] ?? '',
+      'user_phone': profile?['phone'] ?? '',
+      'user_email': profile?['email'] ?? _db.auth.currentUser?.email ?? '',
+    }, onConflict: 'property_id,user_id');
+  }
+
+  // ── Check if current user already requested a visit ──────────────────────
+  Future<bool> isVisitRequested(String propertyId) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return false;
+    final result = await _db
+        .from('visit_requests')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('user_id', uid)
+        .maybeSingle();
+    return result != null;
+  }
+
+  // ── Fetch all visit requests & interests for a property (seller view) ────
+  Future<List<Inquiry>> fetchPropertyInquiries(String propertyId) async {
+    final data = await _db
+        .from('visit_requests')
+        .select()
+        .eq('property_id', propertyId)
+        .order('created_at', ascending: false);
+    return (data as List).map((m) => Inquiry.fromMap(m)).toList();
+  }
+
   // ── Save / bookmark a property ───────────────────────────────────────────
   Future<void> saveProperty(String propertyId) async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
     await _db.from('saved_properties').upsert({
-      'user_id'    : uid,
+      'user_id': uid,
       'property_id': propertyId,
     }, onConflict: 'user_id,property_id');
   }
@@ -214,8 +259,8 @@ class PropertyService {
         .order('saved_at', ascending: false);
 
     return (data as List)
-        .map((row) => Property.fromMap(row['properties'] as Map<String, dynamic>))
+        .map((row) =>
+            Property.fromMap(row['properties'] as Map<String, dynamic>))
         .toList();
   }
 }
-
