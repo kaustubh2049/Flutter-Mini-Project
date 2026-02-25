@@ -28,6 +28,9 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
   bool _saveLoading = false;
   bool _visitRequested = false;
   bool _visitLoading = false;
+  bool _interested = false;
+  bool _interestedLoading = false;
+
 
   @override
   void initState() {
@@ -39,12 +42,15 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     final s = await PropertyService.instance.isSaved(widget.property.id);
     final v =
         await PropertyService.instance.isVisitRequested(widget.property.id);
+    final i = await PropertyService.instance.isInterested(widget.property.id);
     if (mounted)
       setState(() {
         _isSaved = s;
         _visitRequested = v;
+        _interested = i;
       });
   }
+
 
   Future<void> _toggleSave() async {
     if (_saveLoading) return;
@@ -80,15 +86,49 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
 
   Future<void> _scheduleVisit() async {
     if (_visitLoading || _visitRequested) return;
+
+    // 1. Pick Date
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (pickedDate == null) return;
+
+    // 2. Pick Time
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 11, minute: 0),
+    );
+
+    if (pickedTime == null) return;
+
+    final DateTime appointmentAt = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
     setState(() => _visitLoading = true);
     try {
-      await PropertyService.instance.requestVisit(widget.property.id);
+      await PropertyService.instance
+          .requestVisit(widget.property.id, appointmentAt: appointmentAt);
       if (mounted) {
         setState(() => _visitRequested = true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Visit request sent to ${widget.property.ownerName}!',
+              'Visit scheduled for ${_formatDate(appointmentAt)} at ${_formatTime(pickedTime)}',
               style: GoogleFonts.inter(fontWeight: FontWeight.w500),
             ),
             behavior: SnackBarBehavior.floating,
@@ -111,6 +151,53 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       if (mounted) setState(() => _visitLoading = false);
     }
   }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  String _formatTime(TimeOfDay t) {
+    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final min = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$min $period';
+  }
+
+
+  Future<void> _expressInterest() async {
+    if (_interestedLoading || _interested) return;
+    setState(() => _interestedLoading = true);
+    try {
+      await PropertyService.instance.expressInterest(widget.property.id);
+      if (mounted) {
+        setState(() => _interested = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Interest sent to ${widget.property.ownerName}!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Something went wrong. Try again.',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _interestedLoading = false);
+    }
+  }
+
 
   @override
   void dispose() {
@@ -596,6 +683,15 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                 onTap: _launchWhatsApp,
               ),
               const SizedBox(width: 10),
+              // Interested
+              _ActionIconButton(
+                icon: _interested ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: _interested ? Colors.red : AppColors.textPrimary,
+                background: _interested ? Colors.red.withOpacity(0.1) : AppColors.surfaceAlt,
+                onTap: _expressInterest,
+                isLoading: _interestedLoading,
+              ),
+              const SizedBox(width: 10),
               // Schedule Visit
               Expanded(
                 child: GestureDetector(
@@ -645,6 +741,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                   ),
                 ),
               ),
+
             ],
           ),
         ),
@@ -854,12 +951,14 @@ class _ActionIconButton extends StatelessWidget {
   final Color color;
   final Color background;
   final VoidCallback onTap;
+  final bool isLoading;
 
   const _ActionIconButton({
     required this.icon,
     required this.color,
     required this.background,
     required this.onTap,
+    this.isLoading = false,
   });
 
   @override
@@ -873,8 +972,20 @@ class _ActionIconButton extends StatelessWidget {
           color: background,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(icon, color: color, size: 22),
+        child: isLoading
+            ? Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                ),
+              )
+            : Icon(icon, color: color, size: 22),
       ),
     );
   }
 }
+

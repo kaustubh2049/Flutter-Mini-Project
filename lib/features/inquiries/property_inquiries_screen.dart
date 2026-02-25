@@ -85,7 +85,7 @@ class PropertyInquiriesScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Visit Requests',
+                      'Property Inquiries',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -139,39 +139,69 @@ class _InquiryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visits = inquiries.where((i) => i.type == InquiryType.visit).length;
+    final interests = inquiries.where((i) => i.type == InquiryType.interest).length;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       children: [
-        // Summary chip
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(20),
+        // Summary chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _SummaryChip(
+                icon: Icons.calendar_today_rounded,
+                label: '$visits Visit${visits == 1 ? '' : 's'}',
+                color: AppColors.primary,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today_rounded,
-                      size: 14, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${inquiries.length} visit request${inquiries.length == 1 ? '' : 's'}',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 8),
+              _SummaryChip(
+                icon: Icons.favorite_rounded,
+                label: '$interests Interest${interests == 1 ? '' : 's'}',
+                color: AppColors.accent,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         ...inquiries.map((inq) => _InquiryCard(inquiry: inq)),
       ],
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SummaryChip({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -208,6 +238,7 @@ class _InquiryCard extends StatelessWidget {
         : '?';
 
     final formattedDate = _formatDate(inquiry.createdAt);
+    final isVisit = inquiry.type == InquiryType.visit;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -234,7 +265,7 @@ class _InquiryCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: isVisit ? AppColors.primary : AppColors.accent,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
@@ -286,32 +317,65 @@ class _InquiryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Visit request badge
+          // Type badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.1),
+              color: (isVisit ? AppColors.primary : AppColors.accent).withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.calendar_today_rounded,
-                    size: 12, color: AppColors.accent),
+                Icon(
+                  isVisit ? Icons.calendar_today_rounded : Icons.favorite_rounded,
+                  size: 12,
+                  color: isVisit ? AppColors.primary : AppColors.accent,
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  'Requested a visit',
+                  isVisit ? 'Requested a visit' : 'Expressed interest',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
+                    color: isVisit ? AppColors.primary : AppColors.accent,
                   ),
                 ),
               ],
             ),
           ),
 
+          if (isVisit && inquiry.appointmentAt != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.alarm_on_rounded,
+                      size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Scheduled: ${_formatFullDate(inquiry.appointmentAt!)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           if (inquiry.userPhone.isNotEmpty) ...[
+
             const SizedBox(height: 12),
             const Divider(height: 1, color: AppColors.divider),
             const SizedBox(height: 12),
@@ -327,7 +391,7 @@ class _InquiryCard extends StatelessWidget {
                       height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(100),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
@@ -358,7 +422,7 @@ class _InquiryCard extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       color: const Color(0xFF25D366).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      shape: BoxShape.circle,
                       border: Border.all(
                           color: const Color(0xFF25D366).withOpacity(0.3)),
                     ),
@@ -389,22 +453,24 @@ class _InquiryCard extends StatelessWidget {
       return '${diff.inDays}d ago';
     }
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${dt.day} ${months[dt.month - 1]}';
   }
+
+  String _formatFullDate(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final min = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}, $hour:$min $period';
+  }
 }
+
 
 // ── Empty State ───────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
@@ -424,14 +490,14 @@ class _EmptyState extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.calendar_today_rounded,
+                Icons.people_alt_rounded,
                 color: AppColors.primary,
                 size: 36,
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'No visit requests yet',
+              'No inquiries yet',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -440,7 +506,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'When buyers schedule a visit to this property, their details will appear here.',
+              'When buyers express interest or schedule a visit, their details will appear here.',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -481,7 +547,7 @@ class _ErrorState extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Text('Retry',
                   style: GoogleFonts.inter(

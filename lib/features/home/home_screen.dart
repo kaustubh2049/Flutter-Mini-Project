@@ -726,15 +726,15 @@ class _MyListingCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.calendar_today_rounded,
-                    size: 13, color: AppColors.accent),
-                const SizedBox(width: 5),
+                const Icon(Icons.people_outline_rounded,
+                    size: 15, color: AppColors.primary),
+                const SizedBox(width: 6),
                 Text(
-                  'View Visit Requests',
+                  'View Inquiries',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
+                    color: AppColors.primary,
                   ),
                 ),
                 const Spacer(),
@@ -742,6 +742,7 @@ class _MyListingCard extends StatelessWidget {
                     size: 11, color: AppColors.textHint),
               ],
             ),
+
           ],
         ),
       ),

@@ -97,9 +97,13 @@ CREATE TABLE public.property_interests (
     id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
     property_id UUID        REFERENCES public.properties(id) ON DELETE CASCADE NOT NULL,
     user_id     UUID        REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_name   TEXT,
+    user_phone  TEXT,
+    user_email  TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     UNIQUE (property_id, user_id)
 );
+
 
 ALTER TABLE public.property_interests ENABLE ROW LEVEL SECURITY;
 
@@ -194,9 +198,11 @@ CREATE TABLE IF NOT EXISTS public.visit_requests (
     user_name   TEXT,
     user_phone  TEXT,
     user_email  TEXT,
+    appointment_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     UNIQUE (property_id, user_id)
 );
+
 
 ALTER TABLE public.visit_requests ENABLE ROW LEVEL SECURITY;
 

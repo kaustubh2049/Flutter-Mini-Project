@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
+
 import '../../../models/property.dart';
 import '../../../providers/location_provider.dart';
 import '../../../providers/property_provider.dart';
@@ -448,15 +450,16 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 }
 
 // ── Property Featured Card (real data) ───────────────────────────────────────
-class _PropertyFeaturedCard extends StatefulWidget {
+class _PropertyFeaturedCard extends ConsumerStatefulWidget {
   final Property property;
   const _PropertyFeaturedCard({required this.property});
 
   @override
-  State<_PropertyFeaturedCard> createState() => _PropertyFeaturedCardState();
+  ConsumerState<_PropertyFeaturedCard> createState() =>
+      _PropertyFeaturedCardState();
 }
 
-class _PropertyFeaturedCardState extends State<_PropertyFeaturedCard> {
+class _PropertyFeaturedCardState extends ConsumerState<_PropertyFeaturedCard> {
   bool _saved = false;
   bool _saveLoading = false;
 
@@ -481,6 +484,8 @@ class _PropertyFeaturedCardState extends State<_PropertyFeaturedCard> {
         await PropertyService.instance.saveProperty(widget.property.id);
       }
       setState(() => _saved = !_saved);
+      ref.invalidate(savedPropertiesProvider);
+      ref.invalidate(savedIdsProvider);
     } finally {
       if (mounted) setState(() => _saveLoading = false);
     }
@@ -774,15 +779,15 @@ class _StaticFeaturedCardState extends State<_StaticFeaturedCard> {
 }
 
 // ── Real Listing Item (from Supabase) ─────────────────────────────────────────
-class _PropertyListItem extends StatefulWidget {
+class _PropertyListItem extends ConsumerStatefulWidget {
   final Property property;
   const _PropertyListItem({required this.property});
 
   @override
-  State<_PropertyListItem> createState() => _PropertyListItemState();
+  ConsumerState<_PropertyListItem> createState() => _PropertyListItemState();
 }
 
-class _PropertyListItemState extends State<_PropertyListItem> {
+class _PropertyListItemState extends ConsumerState<_PropertyListItem> {
   bool _saved = false;
   bool _saveLoading = false;
   bool _interested = false;
@@ -808,6 +813,8 @@ class _PropertyListItemState extends State<_PropertyListItem> {
         await PropertyService.instance.saveProperty(widget.property.id);
       }
       setState(() => _saved = !_saved);
+      ref.invalidate(savedPropertiesProvider);
+      ref.invalidate(savedIdsProvider);
     } finally {
       if (mounted) setState(() => _saveLoading = false);
     }
@@ -936,10 +943,45 @@ class _PropertyListItemState extends State<_PropertyListItem> {
                     const SizedBox(height: 8),
                     // I'm Interested button
                     GestureDetector(
-                      onTap: () async {
-                        await PropertyService.instance.expressInterest(p.id);
-                        setState(() => _interested = true);
-                      },
+                      onTap: _interested
+                          ? null
+                          : () async {
+                              try {
+                                final uid = Supabase.instance.client.auth.currentUser?.id;
+                                if (uid == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please login to express interest'),
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                await PropertyService.instance.expressInterest(p.id);
+                                if (mounted) {
+                                  setState(() => _interested = true);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Interest sent to ${p.ownerName}!'),
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(
@@ -967,6 +1009,7 @@ class _PropertyListItemState extends State<_PropertyListItem> {
                         ),
                       ),
                     ),
+
                   ],
                 ),
               ),

@@ -161,6 +161,8 @@ class PropertyService {
     }, onConflict: 'property_id,user_id');
   }
 
+
+
   // ── Count interests on a property ────────────────────────────────────────
   Future<int> getInterestCount(String propertyId) async {
     final result = await _db
@@ -170,8 +172,21 @@ class PropertyService {
     return (result as List).length;
   }
 
+  Future<bool> isInterested(String propertyId) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return false;
+    final result = await _db
+        .from('property_interests')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('user_id', uid)
+        .maybeSingle();
+    return result != null;
+  }
+
+
   // ── Request a visit (buyer side) ─────────────────────────────────────────
-  Future<void> requestVisit(String propertyId) async {
+  Future<void> requestVisit(String propertyId, {DateTime? appointmentAt}) async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
 
@@ -188,8 +203,10 @@ class PropertyService {
           profile?['name'] ?? _db.auth.currentUser?.userMetadata?['name'] ?? '',
       'user_phone': profile?['phone'] ?? '',
       'user_email': profile?['email'] ?? _db.auth.currentUser?.email ?? '',
+      'appointment_at': appointmentAt?.toIso8601String(),
     }, onConflict: 'property_id,user_id');
   }
+
 
   // ── Check if current user already requested a visit ──────────────────────
   Future<bool> isVisitRequested(String propertyId) async {
@@ -206,13 +223,30 @@ class PropertyService {
 
   // ── Fetch all visit requests & interests for a property (seller view) ────
   Future<List<Inquiry>> fetchPropertyInquiries(String propertyId) async {
-    final data = await _db
+    final visitsData = await _db
         .from('visit_requests')
         .select()
-        .eq('property_id', propertyId)
-        .order('created_at', ascending: false);
-    return (data as List).map((m) => Inquiry.fromMap(m)).toList();
+        .eq('property_id', propertyId);
+    
+    final interestsData = await _db
+        .from('property_interests')
+        .select()
+        .eq('property_id', propertyId);
+
+    final visits = (visitsData as List)
+        .map((m) => Inquiry.fromMap(m, InquiryType.visit))
+        .toList();
+    
+    final interests = (interestsData as List)
+        .map((m) => Inquiry.fromMap(m, InquiryType.interest))
+        .toList();
+
+    final all = [...visits, ...interests];
+    all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    return all;
   }
+
 
   // ── Save / bookmark a property ───────────────────────────────────────────
   Future<void> saveProperty(String propertyId) async {

@@ -1,5 +1,7 @@
+enum InquiryType { visit, interest }
+
 /// Represents a single buyer enquiry on a seller's property.
-/// Used for both visit requests and (future) expressed interests.
+/// Used for both visit requests and expressed interests.
 class Inquiry {
   final String id;
   final String propertyId;
@@ -8,6 +10,8 @@ class Inquiry {
   final String userPhone;
   final String userEmail;
   final DateTime createdAt;
+  final DateTime? appointmentAt;
+  final InquiryType type;
 
   const Inquiry({
     required this.id,
@@ -17,9 +21,11 @@ class Inquiry {
     required this.userPhone,
     required this.userEmail,
     required this.createdAt,
+    this.appointmentAt,
+    required this.type,
   });
 
-  factory Inquiry.fromMap(Map<String, dynamic> m) => Inquiry(
+  factory Inquiry.fromMap(Map<String, dynamic> m, InquiryType type) => Inquiry(
         id: m['id'] as String,
         propertyId: m['property_id'] as String,
         userId: m['user_id'] as String,
@@ -29,5 +35,11 @@ class Inquiry {
         userPhone: m['user_phone'] as String? ?? '',
         userEmail: m['user_email'] as String? ?? '',
         createdAt: DateTime.parse(m['created_at'] as String),
+        appointmentAt: m['appointment_at'] != null
+            ? DateTime.parse(m['appointment_at'] as String)
+            : null,
+        type: type,
       );
+
 }
+
