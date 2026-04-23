@@ -12,6 +12,7 @@ import 'features/home/home_screen.dart';
 import 'features/add_property/add_property_screen.dart';
 import 'features/property_detail/property_detail_screen.dart';
 import 'features/inquiries/property_inquiries_screen.dart';
+import 'features/chat/chat_screen.dart';
 import 'models/property.dart';
 import 'providers/property_provider.dart';
 
@@ -60,6 +61,13 @@ final _router = GoRouter(
       builder: (context, state) {
         final property = state.extra as Property;
         return PropertyInquiriesScreen(property: property);
+      },
+    ),
+    GoRoute(
+      path: '/chat/:id',
+      builder: (context, state) {
+        final conversationId = state.pathParameters['id']!;
+        return ChatScreen(conversationId: conversationId);
       },
     ),
   ],

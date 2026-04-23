@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -11,6 +13,7 @@ import '../../core/utils/format_utils.dart';
 import '../../models/property.dart';
 import '../../providers/property_provider.dart';
 import '../../services/property_service.dart';
+import '../../services/chat_service.dart';
 
 class PropertyDetailScreen extends ConsumerStatefulWidget {
   final Property property;
@@ -195,6 +198,58 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _interestedLoading = false);
+    }
+  }
+
+
+  Future<void> _startChat() async {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please log in to chat',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final sellerId = widget.property.ownerId;
+    if (sellerId == null || sellerId == currentUser.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You cannot chat on your own listing',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final conversationId = await ChatService.instance.getOrCreateConversation(
+        buyerId: currentUser.id,
+        sellerId: sellerId,
+        propertyId: widget.property.id,
+      );
+
+      if (mounted) {
+        context.push('/chat/$conversationId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not start chat. Try again.',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -681,6 +736,14 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                 color: const Color(0xFF25D366),
                 background: const Color(0xFF25D366).withOpacity(0.1),
                 onTap: _launchWhatsApp,
+              ),
+              const SizedBox(width: 10),
+              // Chat with Owner
+              _ActionIconButton(
+                icon: Icons.message_rounded,
+                color: AppColors.primary,
+                background: AppColors.primary.withOpacity(0.1),
+                onTap: _startChat,
               ),
               const SizedBox(width: 10),
               // Interested
