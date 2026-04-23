@@ -99,4 +99,19 @@ class ChatService {
         .eq('conversation_id', conversationId)
         .order('created_at', ascending: true);
   }
+
+  // ── Fetch all conversations for current user ──────────────────────────────
+  Future<List<Map<String, dynamic>>> getConversations() async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return [];
+
+    // Fetch where user is either buyer or seller
+    final response = await _db
+        .from('conversations')
+        .select('*, properties(title, image_urls)')
+        .or('buyer_id.eq.$uid,seller_id.eq.$uid')
+        .order('created_at', ascending: false);
+
+    return response as List<Map<String, dynamic>>;
+  }
 }

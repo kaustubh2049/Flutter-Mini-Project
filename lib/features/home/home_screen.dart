@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/monetization_provider.dart';
 import '../../providers/property_provider.dart';
 import '../../providers/verification_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../core/utils/format_utils.dart';
 import '../../models/property.dart';
 import '../../models/verification_request.dart';
@@ -466,12 +467,105 @@ class _SavedPropertyCard extends StatelessWidget {
 }
 
 // ── Inbox Tab ────────────────────────────────────────────────────────────────
-class _InboxTab extends StatelessWidget {
+class _InboxTab extends ConsumerWidget {
   const _InboxTab();
 
   @override
-  Widget build(BuildContext context) =>
-      _PlaceholderTab(icon: Icons.chat_bubble_outline_rounded, label: 'Inbox');
+  Widget build(BuildContext context, WidgetRef ref) {
+    final conversationsAsync = ref.watch(conversationsProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        title: Text(
+          'Messages',
+          style: GoogleFonts.plusJakartaSans(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
+        centerTitle: false,
+      ),
+      body: conversationsAsync.when(
+        data: (conversations) {
+          if (conversations.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded,
+                      size: 64, color: AppColors.textHint),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No messages yet',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start a conversation with a property owner!',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(conversationsProvider.future),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: conversations.length,
+              itemBuilder: (context, index) {
+                final conv = conversations[index];
+                final prop = conv['properties'] as Map<String, dynamic>?;
+                final title = prop?['title'] as String? ?? 'Inquiry';
+                final images = prop?['image_urls'] as List?;
+                final img = (images != null && images.isNotEmpty) ? images.first : null;
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.surfaceAlt,
+                    backgroundImage: img != null ? NetworkImage(img) : null,
+                    child: img == null ? const Icon(Icons.home, color: AppColors.textSecondary) : null,
+                  ),
+                  title: Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Tap to view messages',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textHint),
+                  onTap: () => context.push('/chat/${conv['id']}'),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error: $err')),
+      ),
+    );
+  }
 }
 
 // ── Profile Tab ──────────────────────────────────────────────────────────────

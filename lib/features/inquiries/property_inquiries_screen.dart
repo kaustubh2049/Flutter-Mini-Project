@@ -8,6 +8,9 @@ import '../../core/constants/app_colors.dart';
 import '../../models/inquiry.dart';
 import '../../models/property.dart';
 import '../../providers/property_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../../services/chat_service.dart';
+import 'package:go_router/go_router.dart';
 
 class PropertyInquiriesScreen extends ConsumerWidget {
   final Property property;
@@ -165,7 +168,7 @@ class _InquiryList extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        ...inquiries.map((inq) => _InquiryCard(inquiry: inq)),
+        ...inquiries.map((inq) => _InquiryCard(inquiry: inq, property: property)),
       ],
     );
   }
@@ -207,9 +210,10 @@ class _SummaryChip extends StatelessWidget {
 }
 
 // ── Single Inquiry Card ───────────────────────────────────────────────────────
-class _InquiryCard extends StatelessWidget {
+class _InquiryCard extends ConsumerWidget {
   final Inquiry inquiry;
-  const _InquiryCard({required this.inquiry});
+  final Property property;
+  const _InquiryCard({required this.inquiry, required this.property});
 
   Future<void> _call() async {
     if (inquiry.userPhone.isEmpty) return;
@@ -227,7 +231,7 @@ class _InquiryCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final initials = inquiry.userName.isNotEmpty
         ? inquiry.userName
             .trim()
@@ -430,6 +434,34 @@ class _InquiryCard extends StatelessWidget {
                       Icons.chat_rounded,
                       size: 18,
                       color: Color(0xFF25D366),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // In-app Chat
+                GestureDetector(
+                  onTap: () async {
+                    final chatId = await ref.read(chatServiceProvider).getOrCreateConversation(
+                          buyerId: inquiry.userId,
+                          sellerId: property.ownerId,
+                          propertyId: property.id,
+                        );
+                    if (context.mounted) {
+                      context.push('/chat/$chatId');
+                    }
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      size: 18,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
