@@ -497,150 +497,156 @@ class _PropertyFeaturedCardState extends ConsumerState<_PropertyFeaturedCard> {
     final img = p.imageUrls.isNotEmpty ? p.imageUrls.first : null;
 
     return GestureDetector(
-        onTap: () => context.push('/property-detail', extra: p),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: SizedBox(
-            height: 256,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                img != null
-                    ? Image.network(img,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder())
-                    : _placeholder(),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.2),
-                        Colors.black.withOpacity(0.8),
-                      ],
-                      stops: const [0.0, 0.35, 1.0],
-                    ),
+      onTap: () => context.push('/property-detail', extra: p),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: SizedBox(
+          height: 256,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              img != null
+                  ? Image.network(
+                      img,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholder(),
+                    )
+                  : _placeholder(),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.2),
+                      Colors.black.withOpacity(0.8),
+                    ],
+                    stops: const [0.0, 0.35, 1.0],
                   ),
                 ),
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _badge(
                       p.listingType.toUpperCase(),
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: 0.8,
-                      ),
+                      Colors.white.withOpacity(0.9),
+                      textColor: AppColors.textPrimary,
+                    ),
+                    if (p.isFeatured)
+                      _badge('FEATURED', AppColors.accent.withOpacity(0.95)),
+                    if (p.isBoostActive)
+                      _badge('BOOSTED', AppColors.warning.withOpacity(0.95)),
+                    if (p.isVerified)
+                      _badge('VERIFIED', AppColors.success.withOpacity(0.95)),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: GestureDetector(
+                  onTap: _toggleSave,
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _saved
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: _saved ? Colors.red : Colors.white,
+                      size: 18,
                     ),
                   ),
                 ),
-                if (p.isVerified)
-                  Positioned(
-                    top: 12,
-                    left: 80,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '✓ VERIFIED',
+              ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        FormatUtils.formatPrice(p.price),
                         style: GoogleFonts.inter(
-                          fontSize: 10,
+                          fontSize: 22,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          letterSpacing: 0.6,
                         ),
                       ),
-                    ),
-                  ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: GestureDetector(
-                    onTap: _toggleSave,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
+                      const SizedBox(height: 3),
+                      Text(
+                        p.title,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withOpacity(0.88),
+                        ),
                       ),
-                      child: Icon(
-                        _saved
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: _saved ? Colors.red : Colors.white,
-                        size: 18,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on,
+                              size: 14, color: Colors.white60),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${p.locality}, ${p.city}',
+                            style: GoogleFonts.inter(
+                                fontSize: 11, color: Colors.white60),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          FormatUtils.formatPrice(p.price),
-                          style: GoogleFonts.inter(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          p.title,
-                          style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.88)),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on,
-                                size: 14, color: Colors.white60),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${p.locality}, ${p.city}',
-                              style: GoogleFonts.inter(
-                                  fontSize: 11, color: Colors.white60),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ));
+        ),
+      ),
+    );
   }
 
   Widget _placeholder() => Container(
         color: AppColors.surfaceAlt,
         child: const Icon(Icons.home, size: 60, color: AppColors.textHint),
       );
+
+  Widget _badge(
+    String label,
+    Color bgColor, {
+    Color textColor = Colors.white,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: textColor,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
 }
 
 // ── Static featured card (fallback) ──────────────────────────────────────────
@@ -867,23 +873,24 @@ class _PropertyListItemState extends ConsumerState<_PropertyListItem> {
                     Positioned(
                       top: 6,
                       left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: p.listingType == 'Rent'
-                              ? AppColors.rent
-                              : AppColors.buy,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          p.listingType,
-                          style: GoogleFonts.inter(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                      right: 6,
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          _smallBadge(
+                            p.listingType,
+                            p.listingType == 'Rent'
+                                ? AppColors.rent
+                                : AppColors.buy,
                           ),
-                        ),
+                          if (p.isFeatured)
+                            _smallBadge('Featured', AppColors.accent),
+                          if (p.isBoostActive)
+                            _smallBadge('Boosted', AppColors.warning),
+                          if (p.isVerified)
+                            _smallBadge('Verified', AppColors.success),
+                        ],
                       ),
                     ),
                   ],
@@ -947,11 +954,13 @@ class _PropertyListItemState extends ConsumerState<_PropertyListItem> {
                           ? null
                           : () async {
                               try {
-                                final uid = Supabase.instance.client.auth.currentUser?.id;
+                                final uid = Supabase
+                                    .instance.client.auth.currentUser?.id;
                                 if (uid == null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Please login to express interest'),
+                                      content: Text(
+                                          'Please login to express interest'),
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: AppColors.error,
                                     ),
@@ -959,12 +968,14 @@ class _PropertyListItemState extends ConsumerState<_PropertyListItem> {
                                   return;
                                 }
 
-                                await PropertyService.instance.expressInterest(p.id);
+                                await PropertyService.instance
+                                    .expressInterest(p.id);
                                 if (mounted) {
                                   setState(() => _interested = true);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Interest sent to ${p.ownerName}!'),
+                                      content: Text(
+                                          'Interest sent to ${p.ownerName}!'),
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: AppColors.success,
                                     ),
@@ -1009,13 +1020,30 @@ class _PropertyListItemState extends ConsumerState<_PropertyListItem> {
                         ),
                       ),
                     ),
-
                   ],
                 ),
               ),
             ],
           ),
         ));
+  }
+
+  Widget _smallBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    );
   }
 }
 

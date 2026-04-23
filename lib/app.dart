@@ -13,8 +13,12 @@ import 'features/add_property/add_property_screen.dart';
 import 'features/property_detail/property_detail_screen.dart';
 import 'features/inquiries/property_inquiries_screen.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/seller/verification_request_screen.dart';
+import 'features/admin/admin_dashboard_screen.dart';
 import 'models/property.dart';
+import 'providers/monetization_provider.dart';
 import 'providers/property_provider.dart';
+import 'providers/verification_provider.dart';
 
 // Notifier that rebuilds the router when auth state changes
 class _AuthChangeNotifier extends ChangeNotifier {
@@ -70,6 +74,17 @@ final _router = GoRouter(
         return ChatScreen(conversationId: conversationId);
       },
     ),
+    GoRoute(
+      path: '/verification-request',
+      builder: (context, state) {
+        final propertyId = state.uri.queryParameters['propertyId'];
+        return VerificationRequestScreen(initialPropertyId: propertyId);
+      },
+    ),
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => const AdminDashboardScreen(),
+    ),
   ],
 );
 
@@ -98,6 +113,9 @@ class _PropVistaAppState extends ConsumerState<PropVistaApp> {
         ref.invalidate(homeFeedProvider);
         ref.invalidate(featuredProvider);
         ref.invalidate(propertyInquiriesProvider);
+        ref.invalidate(planUsageProvider);
+        ref.invalidate(myVerificationRequestsProvider);
+        ref.invalidate(allVerificationRequestsProvider);
       }
     });
   }

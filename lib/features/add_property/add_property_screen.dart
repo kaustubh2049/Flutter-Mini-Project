@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/property_provider.dart';
+import '../../services/monetization_service.dart';
 import '../../services/property_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +176,15 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       _snack('Please add at least one photo');
       return;
     }
+
+    final usage = await MonetizationService.instance.getPlanUsage();
+    if (!usage.canCreateMore) {
+      _snack(
+        '${usage.plan.label} plan limit reached. Upgrade plan to add more listings.',
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {

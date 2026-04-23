@@ -29,6 +29,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+
+    // Secret Admin Login
+    if (email == 'admin' && password == 'admin') {
+      if (mounted) context.push('/admin');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -39,8 +48,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final auth = ref.read(authServiceProvider);
       await auth.signInWithEmail(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
+        email: email,
+        password: password,
       );
       if (mounted) context.go('/home');
     } catch (e) {

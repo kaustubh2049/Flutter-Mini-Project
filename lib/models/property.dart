@@ -1,6 +1,6 @@
 class Property {
   final String id;
-  final String? ownerId;   // Supabase auth user id of the poster
+  final String? ownerId; // Supabase auth user id of the poster
   final String title;
   final String type;
   final String listingType; // 'Rent' | 'Buy'
@@ -18,6 +18,8 @@ class Property {
   final String ownerPhone;
   final bool isVerified;
   final bool isFeatured;
+  final bool isBoosted;
+  final DateTime? boostExpiry;
   final bool isActive;
   final DateTime postedAt;
 
@@ -41,9 +43,17 @@ class Property {
     required this.ownerPhone,
     this.isVerified = false,
     this.isFeatured = false,
+    this.isBoosted = false,
+    this.boostExpiry,
     this.isActive = true,
     required this.postedAt,
   });
+
+  bool get isBoostActive {
+    if (!isBoosted) return false;
+    if (boostExpiry == null) return true;
+    return boostExpiry!.isAfter(DateTime.now());
+  }
 
   factory Property.fromMap(Map<String, dynamic> map) {
     return Property(
@@ -66,6 +76,10 @@ class Property {
       ownerPhone: map['owner_phone'] ?? '',
       isVerified: map['is_verified'] ?? false,
       isFeatured: map['is_featured'] ?? false,
+      isBoosted: map['is_boosted'] ?? false,
+      boostExpiry: map['boost_expiry'] != null
+          ? DateTime.tryParse(map['boost_expiry'].toString())
+          : null,
       isActive: map['is_active'] ?? true,
       postedAt: DateTime.parse(
         map['posted_at'] ?? DateTime.now().toIso8601String(),

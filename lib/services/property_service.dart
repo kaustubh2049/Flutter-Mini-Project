@@ -34,9 +34,14 @@ class PropertyService {
       query = query.ilike('city', '%$city%');
     }
 
-    final data = await query.order('posted_at', ascending: false).limit(limit);
+    final data = await query
+        .order('is_boosted', ascending: false)
+        .order('posted_at', ascending: false)
+        .limit(limit);
 
-    return (data as List).map((m) => Property.fromMap(m)).toList();
+    final properties = (data as List).map((m) => Property.fromMap(m)).toList();
+    _sortByBoostPriority(properties);
+    return properties;
   }
 
   // ── Fetch featured (is_featured = true, exclude own) ────────────────────
@@ -51,8 +56,13 @@ class PropertyService {
 
     if (uid != null) query = query.neq('owner_id', uid);
 
-    final data = await query.limit(5);
-    return (data as List).map((m) => Property.fromMap(m)).toList();
+    final data = await query
+        .order('is_boosted', ascending: false)
+        .order('posted_at', ascending: false)
+        .limit(8);
+    final properties = (data as List).map((m) => Property.fromMap(m)).toList();
+    _sortByBoostPriority(properties);
+    return properties.take(5).toList();
   }
 
   // ── Fetch seller's own listings ──────────────────────────────────────────
@@ -66,7 +76,50 @@ class PropertyService {
         .eq('owner_id', uid)
         .order('posted_at', ascending: false);
 
-    return (data as List).map((m) => Property.fromMap(m)).toList();
+    final properties = (data as List).map((m) => Property.fromMap(m)).toList();
+    _sortByBoostPriority(properties);
+    return properties;
+  }
+
+  Future<void> boostProperty(
+    String propertyId, {
+    Duration duration = const Duration(days: 7),
+  }) async {
+    final row = await _db
+        .from('properties')
+        .select('boost_expiry')
+        .eq('id', propertyId)
+        .maybeSingle();
+
+    var start = DateTime.now();
+    final currentExpiry = row?['boost_expiry'];
+    if (currentExpiry != null) {
+      final parsed = DateTime.tryParse(currentExpiry.toString());
+      if (parsed != null && parsed.isAfter(start)) {
+        start = parsed;
+      }
+    }
+
+    await _db.from('properties').update({
+      'is_boosted': true,
+      'boost_expiry': start.add(duration).toIso8601String(),
+    }).eq('id', propertyId);
+  }
+
+  Future<void> clearBoost(String propertyId) async {
+    await _db.from('properties').update({
+      'is_boosted': false,
+      'boost_expiry': null,
+    }).eq('id', propertyId);
+  }
+
+  void _sortByBoostPriority(List<Property> properties) {
+    properties.sort((a, b) {
+      final boostCompare =
+          (b.isBoostActive ? 1 : 0) - (a.isBoostActive ? 1 : 0);
+      if (boostCompare != 0) return boostCompare;
+      return b.postedAt.compareTo(a.postedAt);
+    });
   }
 
   // ── Add a new property (with image upload) ───────────────────────────────
@@ -161,8 +214,6 @@ class PropertyService {
     }, onConflict: 'property_id,user_id');
   }
 
-
-
   // ── Count interests on a property ────────────────────────────────────────
   Future<int> getInterestCount(String propertyId) async {
     final result = await _db
@@ -184,9 +235,9 @@ class PropertyService {
     return result != null;
   }
 
-
   // ── Request a visit (buyer side) ─────────────────────────────────────────
-  Future<void> requestVisit(String propertyId, {DateTime? appointmentAt}) async {
+  Future<void> requestVisit(String propertyId,
+      {DateTime? appointmentAt}) async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
 
@@ -207,7 +258,6 @@ class PropertyService {
     }, onConflict: 'property_id,user_id');
   }
 
-
   // ── Check if current user already requested a visit ──────────────────────
   Future<bool> isVisitRequested(String propertyId) async {
     final uid = _db.auth.currentUser?.id;
@@ -223,11 +273,9 @@ class PropertyService {
 
   // ── Fetch all visit requests & interests for a property (seller view) ────
   Future<List<Inquiry>> fetchPropertyInquiries(String propertyId) async {
-    final visitsData = await _db
-        .from('visit_requests')
-        .select()
-        .eq('property_id', propertyId);
-    
+    final visitsData =
+        await _db.from('visit_requests').select().eq('property_id', propertyId);
+
     final interestsData = await _db
         .from('property_interests')
         .select()
@@ -236,17 +284,16 @@ class PropertyService {
     final visits = (visitsData as List)
         .map((m) => Inquiry.fromMap(m, InquiryType.visit))
         .toList();
-    
+
     final interests = (interestsData as List)
         .map((m) => Inquiry.fromMap(m, InquiryType.interest))
         .toList();
 
     final all = [...visits, ...interests];
     all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
+
     return all;
   }
-
 
   // ── Save / bookmark a property ───────────────────────────────────────────
   Future<void> saveProperty(String propertyId) async {

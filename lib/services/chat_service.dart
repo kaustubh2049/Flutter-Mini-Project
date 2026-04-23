@@ -5,6 +5,7 @@ class ChatService {
   static final instance = ChatService._();
 
   final _db = Supabase.instance.client;
+  String? _messageColumnCache;
 
   // ── Get or create a conversation between buyer & seller for a property ────
   Future<String> getOrCreateConversation({
@@ -26,11 +27,15 @@ class ChatService {
     }
 
     // Create a new conversation
-    final result = await _db.from('conversations').insert({
-      'buyer_id': buyerId,
-      'seller_id': sellerId,
-      'property_id': propertyId,
-    }).select('id').single();
+    final result = await _db
+        .from('conversations')
+        .insert({
+          'buyer_id': buyerId,
+          'seller_id': sellerId,
+          'property_id': propertyId,
+        })
+        .select('id')
+        .single();
 
     return result['id'] as String;
   }
@@ -41,11 +46,49 @@ class ChatService {
     required String senderId,
     required String message,
   }) async {
-    await _db.from('messages').insert({
+    final basePayload = {
       'conversation_id': conversationId,
       'sender_id': senderId,
-      'content': message,
-    });
+    };
+
+    final candidateColumns = <String>[
+      if (_messageColumnCache != null) _messageColumnCache!,
+      'content',
+      'message',
+      'text',
+    ].toSet().toList();
+
+    PostgrestException? missingColumnError;
+
+    for (final column in candidateColumns) {
+      try {
+        final Map<String, dynamic> data = {...basePayload};
+        data[column] = message;
+        await _db.from('messages').insert(data);
+        _messageColumnCache = column;
+        return;
+      } on PostgrestException catch (e) {
+        if (_isMissingColumnError(e, column)) {
+          missingColumnError = e;
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    if (missingColumnError != null) {
+      throw missingColumnError;
+    }
+
+    throw Exception('Could not determine messages text column.');
+  }
+
+  bool _isMissingColumnError(PostgrestException error, String columnName) {
+    final details =
+        '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
+            .toLowerCase();
+    return details.contains('column') &&
+        details.contains(columnName.toLowerCase());
   }
 
   // ── Stream messages in realtime ───────────────────────────────────────────

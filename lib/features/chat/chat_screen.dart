@@ -19,6 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _chatService = ChatService.instance;
 
   String? _currentUserId;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -47,15 +48,37 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _msgController.text.trim();
-    if (text.isEmpty || _currentUserId == null) return;
+    if (_sending || text.isEmpty || _currentUserId == null) return;
 
     _msgController.clear();
+    setState(() => _sending = true);
 
-    await _chatService.sendMessage(
-      conversationId: widget.conversationId,
-      senderId: _currentUserId!,
-      message: text,
-    );
+    try {
+      await _chatService.sendMessage(
+        conversationId: widget.conversationId,
+        senderId: _currentUserId!,
+        message: text,
+      );
+    } catch (e) {
+      _msgController.text = text;
+      _msgController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _msgController.text.length),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString()}',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -66,7 +89,8 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -92,6 +116,22 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Unable to load messages right now.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 final messages = snapshot.data ?? [];
 
                 if (messages.isEmpty) {
@@ -100,7 +140,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.chat_bubble_outline_rounded,
-                            size: 56, color: AppColors.textHint.withOpacity(0.5)),
+                            size: 56,
+                            color: AppColors.textHint.withOpacity(0.5)),
                         const SizedBox(height: 12),
                         Text(
                           'No messages yet',
@@ -126,15 +167,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg['sender_id'] == _currentUserId;
                     return _MessageBubble(
-                      text: msg['content'] ?? '',
+                      text: _messageText(msg),
                       isMe: isMe,
-                      timestamp: DateTime.tryParse(msg['created_at'] ?? ''),
+                      timestamp: DateTime.tryParse(
+                          msg['created_at']?.toString() ?? ''),
                     );
                   },
                 );
@@ -193,13 +236,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         vertical: 10,
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    onSubmitted: (_) {
+                      if (!_sending) _sendMessage();
+                    },
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: _sendMessage,
+                onTap: _sending ? null : _sendMessage,
                 child: Container(
                   width: 44,
                   height: 44,
@@ -207,11 +252,19 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.send_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  child: _sending
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                 ),
               ),
             ],
@@ -219,6 +272,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  String _messageText(Map<String, dynamic> message) {
+    final value =
+        message['content'] ?? message['message'] ?? message['text'] ?? '';
+    return value.toString();
   }
 }
 
@@ -278,9 +337,8 @@ class _MessageBubble extends StatelessWidget {
                 _formatTime(timestamp!),
                 style: GoogleFonts.inter(
                   fontSize: 10,
-                  color: isMe
-                      ? Colors.white.withOpacity(0.6)
-                      : AppColors.textHint,
+                  color:
+                      isMe ? Colors.white.withOpacity(0.6) : AppColors.textHint,
                 ),
               ),
             ],

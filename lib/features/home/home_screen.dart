@@ -6,9 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/monetization_provider.dart';
 import '../../providers/property_provider.dart';
+import '../../providers/verification_provider.dart';
 import '../../core/utils/format_utils.dart';
 import '../../models/property.dart';
+import '../../models/verification_request.dart';
+import '../../services/monetization_service.dart';
 import '../../services/property_service.dart';
 import 'tabs/home_tab.dart';
 
@@ -337,21 +341,33 @@ class _SavedPropertyCard extends StatelessWidget {
                     Positioned(
                       top: 12,
                       left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: p.listingType == 'Rent'
-                              ? AppColors.rent
-                              : AppColors.buy,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(p.listingType,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            )),
+                      right: 56,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _MiniBadge(
+                            label: p.listingType,
+                            color: p.listingType == 'Rent'
+                                ? AppColors.rent
+                                : AppColors.buy,
+                          ),
+                          if (p.isFeatured)
+                            const _MiniBadge(
+                              label: 'Featured',
+                              color: AppColors.accent,
+                            ),
+                          if (p.isBoostActive)
+                            const _MiniBadge(
+                              label: 'Boosted',
+                              color: AppColors.warning,
+                            ),
+                          if (p.isVerified)
+                            const _MiniBadge(
+                              label: 'Verified',
+                              color: AppColors.success,
+                            ),
+                        ],
                       ),
                     ),
                     Positioned(
@@ -398,18 +414,6 @@ class _SavedPropertyCard extends StatelessWidget {
                               color: AppColors.textSecondary,
                             )),
                         const Spacer(),
-                        if (p.isVerified)
-                          Row(children: [
-                            const Icon(Icons.verified_rounded,
-                                color: AppColors.verified, size: 15),
-                            const SizedBox(width: 3),
-                            Text('Verified',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: AppColors.verified,
-                                  fontWeight: FontWeight.w600,
-                                )),
-                          ]),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -479,6 +483,8 @@ class _ProfileTab extends ConsumerWidget {
     final user = Supabase.instance.client.auth.currentUser;
     final name = user?.userMetadata?['name'] as String? ?? 'User';
     final email = user?.email ?? '';
+    final planUsageAsync = ref.watch(planUsageProvider);
+    final verificationAsync = ref.watch(myVerificationRequestsProvider);
     final myListingsAsync = ref.watch(myListingsProvider);
 
     return SingleChildScrollView(
@@ -511,6 +517,13 @@ class _ProfileTab extends ConsumerWidget {
           Text(email,
               style: GoogleFonts.inter(
                   fontSize: 13, color: AppColors.textSecondary)),
+          const SizedBox(height: 18),
+
+          _SellerOverviewCard(
+            planUsageAsync: planUsageAsync,
+            verificationAsync: verificationAsync,
+            onRequestVerification: () => context.push('/verification-request'),
+          ),
           const SizedBox(height: 32),
 
           // ── My Estate (Seller View) ───────────────────────────────────
@@ -602,14 +615,237 @@ class _ProfileTab extends ConsumerWidget {
   }
 }
 
+class _SellerOverviewCard extends StatelessWidget {
+  final AsyncValue<PlanUsage> planUsageAsync;
+  final AsyncValue<List<VerificationRequest>> verificationAsync;
+  final VoidCallback onRequestVerification;
+
+  const _SellerOverviewCard({
+    required this.planUsageAsync,
+    required this.verificationAsync,
+    required this.onRequestVerification,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Seller Dashboard',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          planUsageAsync.when(
+            data: (usage) {
+              final planChipColor = usage.plan.type == 'elite'
+                  ? AppColors.success
+                  : usage.plan.type == 'pro'
+                      ? AppColors.accent
+                      : AppColors.textSecondary;
+
+              final listingLabel = usage.plan.isUnlimited
+                  ? '${usage.activeListingCount} active listings (unlimited)'
+                  : '${usage.activeListingCount}/${usage.plan.listingLimit} active listings';
+
+              return Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: planChipColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${usage.plan.label} Plan',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: planChipColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      listingLabel,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+            loading: () =>
+                const LinearProgressIndicator(color: AppColors.primary),
+            error: (_, __) => Text(
+              'Plan: Free',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          verificationAsync.when(
+            data: (requests) {
+              if (requests.isEmpty) {
+                return Text(
+                  'Verification: no request yet',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              }
+
+              final latest = requests.first;
+              final status = latest.status.name;
+              final color = status == 'approved'
+                  ? AppColors.success
+                  : status == 'rejected'
+                      ? AppColors.error
+                      : AppColors.warning;
+
+              return Row(
+                children: [
+                  Text(
+                    'Verification status:',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => Text(
+              'Verification status unavailable',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onRequestVerification,
+              icon: const Icon(Icons.verified_user_outlined, size: 18),
+              label: Text(
+                'Upload Documents For Verification',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── My Listing Card (seller sees their own property with interest count) ──────
-class _MyListingCard extends StatelessWidget {
+class _MyListingCard extends ConsumerStatefulWidget {
   final Property property;
   const _MyListingCard({required this.property});
 
   @override
+  ConsumerState<_MyListingCard> createState() => _MyListingCardState();
+}
+
+class _MyListingCardState extends ConsumerState<_MyListingCard> {
+  bool _boosting = false;
+
+  Future<void> _boostListing() async {
+    if (_boosting) return;
+    setState(() => _boosting = true);
+    try {
+      await ref.read(monetizationServiceProvider).boostListing(
+            widget.property.id,
+            duration: const Duration(days: 7),
+          );
+      ref.invalidate(myListingsProvider);
+      ref.invalidate(homeFeedProvider);
+      ref.invalidate(featuredProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Listing boosted for 7 days.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.toString(),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _boosting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final p = property;
+    final p = widget.property;
     final img = p.imageUrls.isNotEmpty ? p.imageUrls.first : null;
 
     return GestureDetector(
@@ -674,47 +910,47 @@ class _MyListingCard extends StatelessWidget {
                           style: GoogleFonts.inter(
                               fontSize: 11, color: AppColors.textSecondary)),
                       const SizedBox(height: 6),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: p.isActive
-                                  ? AppColors.success.withOpacity(0.1)
-                                  : AppColors.error.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              p.isActive ? 'Active' : 'Inactive',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: p.isActive
-                                    ? AppColors.success
-                                    : AppColors.error,
-                              ),
-                            ),
+                          _MiniBadge(
+                            label: p.isActive ? 'Active' : 'Inactive',
+                            color: p.isActive
+                                ? AppColors.success
+                                : AppColors.error,
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.07),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              p.listingType,
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                          _MiniBadge(
+                            label: p.listingType,
+                            color: AppColors.primary,
                           ),
+                          if (p.isFeatured)
+                            const _MiniBadge(
+                              label: 'Featured',
+                              color: AppColors.accent,
+                            ),
+                          if (p.isBoostActive)
+                            const _MiniBadge(
+                              label: 'Boosted',
+                              color: AppColors.warning,
+                            ),
+                          if (p.isVerified)
+                            const _MiniBadge(
+                              label: 'Verified',
+                              color: AppColors.success,
+                            ),
                         ],
                       ),
+                      if (p.isBoostActive && p.boostExpiry != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Boost expiry: ${_dateLabel(p.boostExpiry!)}',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -738,12 +974,71 @@ class _MyListingCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 11, color: AppColors.textHint),
+                GestureDetector(
+                  onTap: _boosting ? null : _boostListing,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border:
+                          Border.all(color: AppColors.warning.withOpacity(0.4)),
+                    ),
+                    child: _boosting
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              color: AppColors.warning,
+                            ),
+                          )
+                        : Text(
+                            p.isBoostActive ? 'Extend Boost' : 'Boost Listing',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                  ),
+                ),
               ],
             ),
-
           ],
+        ),
+      ),
+    );
+  }
+
+  String _dateLabel(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _MiniBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
       ),
     );

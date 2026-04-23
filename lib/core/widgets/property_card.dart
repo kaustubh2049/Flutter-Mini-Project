@@ -104,7 +104,8 @@ class _FeaturedCardState extends ConsumerState<_FeaturedCard> {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 170,
-                      decoration: const BoxDecoration(color: AppColors.surfaceAlt),
+                      decoration:
+                          const BoxDecoration(color: AppColors.surfaceAlt),
                       child: const Icon(Icons.home_outlined,
                           size: 48, color: AppColors.textHint),
                     ),
@@ -114,14 +115,38 @@ class _FeaturedCardState extends ConsumerState<_FeaturedCard> {
                     left: 12,
                     right: 12,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _Badge(
-                          label: p.listingType,
-                          color: p.listingType == 'Rent'
-                              ? AppColors.rent
-                              : AppColors.buy,
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _Badge(
+                                label: p.listingType,
+                                color: p.listingType == 'Rent'
+                                    ? AppColors.rent
+                                    : AppColors.buy,
+                              ),
+                              if (p.isFeatured)
+                                const _Badge(
+                                  label: 'Featured',
+                                  color: AppColors.accent,
+                                ),
+                              if (p.isBoostActive)
+                                const _Badge(
+                                  label: 'Boosted',
+                                  color: AppColors.warning,
+                                ),
+                              if (p.isVerified)
+                                const _Badge(
+                                  label: 'Verified',
+                                  color: AppColors.success,
+                                ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         GestureDetector(
                           onTap: _toggleSave,
                           child: Container(
@@ -149,7 +174,9 @@ class _FeaturedCardState extends ConsumerState<_FeaturedCard> {
                                     _saved
                                         ? Icons.favorite_rounded
                                         : Icons.favorite_border_rounded,
-                                    color: _saved ? Colors.red : AppColors.textSecondary,
+                                    color: _saved
+                                        ? Colors.red
+                                        : AppColors.textSecondary,
                                     size: 18,
                                   ),
                           ),
@@ -183,20 +210,6 @@ class _FeaturedCardState extends ConsumerState<_FeaturedCard> {
                         ),
                       ),
                       const Spacer(),
-                      if (p.isVerified)
-                        Row(
-                          children: [
-                            const Icon(Icons.verified_rounded,
-                                color: AppColors.verified, size: 15),
-                            const SizedBox(width: 3),
-                            Text('Verified',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  color: AppColors.verified,
-                                  fontWeight: FontWeight.w600,
-                                )),
-                          ],
-                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -328,7 +341,8 @@ class _GridCardState extends ConsumerState<_GridCard> {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 120,
-                      decoration: const BoxDecoration(color: AppColors.surfaceAlt),
+                      decoration:
+                          const BoxDecoration(color: AppColors.surfaceAlt),
                       child: const Icon(Icons.home_outlined,
                           color: AppColors.textHint),
                     ),
@@ -336,12 +350,37 @@ class _GridCardState extends ConsumerState<_GridCard> {
                   Positioned(
                     top: 8,
                     left: 8,
-                    child: _Badge(
-                      label: p.listingType,
-                      color: p.listingType == 'Rent'
-                          ? AppColors.rent
-                          : AppColors.buy,
-                      small: true,
+                    right: 8,
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        _Badge(
+                          label: p.listingType,
+                          color: p.listingType == 'Rent'
+                              ? AppColors.rent
+                              : AppColors.buy,
+                          small: true,
+                        ),
+                        if (p.isFeatured)
+                          const _Badge(
+                            label: 'Featured',
+                            color: AppColors.accent,
+                            small: true,
+                          ),
+                        if (p.isBoostActive)
+                          const _Badge(
+                            label: 'Boosted',
+                            color: AppColors.warning,
+                            small: true,
+                          ),
+                        if (p.isVerified)
+                          const _Badge(
+                            label: 'Verified',
+                            color: AppColors.success,
+                            small: true,
+                          ),
+                      ],
                     ),
                   ),
                   Positioned(
@@ -375,7 +414,9 @@ class _GridCardState extends ConsumerState<_GridCard> {
                                     ? Icons.favorite_rounded
                                     : Icons.favorite_border_rounded,
                                 size: 14,
-                                color: _saved ? Colors.red : AppColors.textSecondary,
+                                color: _saved
+                                    ? Colors.red
+                                    : AppColors.textSecondary,
                               ),
                       ),
                     ),
@@ -405,11 +446,6 @@ class _GridCardState extends ConsumerState<_GridCard> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      if (p.isVerified) ...[
-                        const Spacer(),
-                        const Icon(Icons.verified_rounded,
-                            color: AppColors.verified, size: 13),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 2),

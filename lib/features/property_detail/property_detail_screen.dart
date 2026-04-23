@@ -34,7 +34,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
   bool _interested = false;
   bool _interestedLoading = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -53,7 +52,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
         _interested = i;
       });
   }
-
 
   Future<void> _toggleSave() async {
     if (_saveLoading) return;
@@ -166,7 +164,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     return '$hour:$min $period';
   }
 
-
   Future<void> _expressInterest() async {
     if (_interestedLoading || _interested) return;
     setState(() => _interestedLoading = true);
@@ -200,7 +197,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       if (mounted) setState(() => _interestedLoading = false);
     }
   }
-
 
   Future<void> _startChat() async {
     final currentUser = Supabase.instance.client.auth.currentUser;
@@ -252,7 +248,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       }
     }
   }
-
 
   @override
   void dispose() {
@@ -440,10 +435,24 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                 label: p.listingType,
                 color: p.listingType == 'Rent' ? AppColors.rent : AppColors.buy,
               ),
+              if (p.isFeatured) ...[
+                const SizedBox(width: 8),
+                const _Badge(
+                  label: 'Featured',
+                  color: AppColors.accent,
+                ),
+              ],
+              if (p.isBoostActive) ...[
+                const SizedBox(width: 8),
+                const _Badge(
+                  label: 'Boosted',
+                  color: AppColors.warning,
+                ),
+              ],
               if (p.isVerified) ...[
                 const SizedBox(width: 8),
-                _Badge(
-                  label: '✓ Verified',
+                const _Badge(
+                  label: 'PropVista Verified',
                   color: AppColors.success,
                 ),
               ],
@@ -748,9 +757,13 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
               const SizedBox(width: 10),
               // Interested
               _ActionIconButton(
-                icon: _interested ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                icon: _interested
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
                 color: _interested ? Colors.red : AppColors.textPrimary,
-                background: _interested ? Colors.red.withOpacity(0.1) : AppColors.surfaceAlt,
+                background: _interested
+                    ? Colors.red.withOpacity(0.1)
+                    : AppColors.surfaceAlt,
                 onTap: _expressInterest,
                 isLoading: _interestedLoading,
               ),
@@ -804,7 +817,6 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -1051,4 +1063,3 @@ class _ActionIconButton extends StatelessWidget {
     );
   }
 }
-
