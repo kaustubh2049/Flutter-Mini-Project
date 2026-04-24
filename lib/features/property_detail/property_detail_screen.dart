@@ -8,12 +8,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/format_utils.dart';
+import '../../core/utils/emi_utils.dart';
 import '../../models/property.dart';
 import '../../providers/property_provider.dart';
+import '../../providers/review_provider.dart';
 import '../../services/property_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/review_service.dart';
 
 class PropertyDetailScreen extends ConsumerStatefulWidget {
   final Property property;
@@ -33,6 +38,11 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
   bool _visitLoading = false;
   bool _interested = false;
   bool _interestedLoading = false;
+
+  // Review state
+  int _rating = 5;
+  final _commentCtrl = TextEditingController();
+  bool _submittingReview = false;
 
   @override
   void initState() {
@@ -249,9 +259,85 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     }
   }
 
+  Future<void> _deleteListing() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Listing?', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        content: Text('This action cannot be undone. Are you sure?', style: GoogleFonts.inter()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: GoogleFonts.inter(color: AppColors.error, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await PropertyService.instance.deleteProperty(widget.property.id);
+        ref.invalidate(homeFeedProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Property deleted successfully')),
+          );
+          Navigator.of(context).pop(); // Go back to home
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _submitReview() async {
+    if (_submittingReview) return;
+    if (_commentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a comment')),
+      );
+      return;
+    }
+
+    setState(() => _submittingReview = true);
+    try {
+      await ReviewService.instance.addReview(
+        propertyId: widget.property.id,
+        rating: _rating,
+        comment: _commentCtrl.text.trim(),
+      );
+      _commentCtrl.clear();
+      setState(() => _rating = 5);
+      ref.invalidate(propertyReviewsProvider(widget.property.id));
+      ref.invalidate(averageRatingProvider(widget.property.id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Review submitted!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submittingReview = false);
+    }
+  }
+
   @override
   void dispose() {
     _pageCtrl.dispose();
+    _commentCtrl.dispose();
     super.dispose();
   }
 
@@ -310,14 +396,27 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
               icon: Icons.arrow_back_rounded,
               onTap: () => Navigator.of(context).pop(),
             ),
-            _CircleButton(
-              icon: _saveLoading
-                  ? Icons.hourglass_empty_rounded
-                  : _isSaved
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-              iconColor: _isSaved ? AppColors.accent : AppColors.textPrimary,
-              onTap: _toggleSave,
+            Row(
+              children: [
+                if (widget.property.ownerId == Supabase.instance.client.auth.currentUser?.id)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: _CircleButton(
+                      icon: Icons.delete_outline_rounded,
+                      iconColor: AppColors.error,
+                      onTap: _deleteListing,
+                    ),
+                  ),
+                _CircleButton(
+                  icon: _saveLoading
+                      ? Icons.hourglass_empty_rounded
+                      : _isSaved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                  iconColor: _isSaved ? AppColors.accent : AppColors.textPrimary,
+                  onTap: _toggleSave,
+                ),
+              ],
             ),
           ],
         ),
@@ -406,16 +505,26 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
         children: [
           const SizedBox(height: 20),
           _buildHeaderSection(p),
+          if (p.listingType == 'Buy') ...[
+            _buildDivider(),
+            _buildEmiSection(p),
+          ],
           _buildDivider(),
           _buildAboutSection(p),
           if (p.amenities.isNotEmpty) ...[
             _buildDivider(),
             _buildAmenitiesSection(p),
           ],
+          if (p.latitude != null && p.longitude != null) ...[
+            _buildDivider(),
+            _buildMapSection(p),
+          ],
           _buildDivider(),
           _buildOwnerSection(p),
           _buildDivider(),
           _buildDetailsSection(p),
+          _buildDivider(),
+          _buildReviewsSection(p),
         ],
       ),
     );
@@ -432,7 +541,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
           Row(
             children: [
               _Badge(
-                label: p.listingType,
+                label: FormatUtils.listingTypeLabel(p.listingType),
                 color: p.listingType == 'Rent' ? AppColors.rent : AppColors.buy,
               ),
               if (p.isFeatured) ...[
@@ -823,6 +932,401 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       ),
     );
   }
+
+  // ── EMI Section ────────────────────────────────────────────────────────────
+  Widget _buildEmiSection(Property p) {
+    // Basic EMI estimation: 20% down payment, 8.5% interest, 20 years
+    final principal = p.price * 0.8;
+    final emi = EmiUtils.calculateEmi(
+      principal: principal,
+      annualRate: 8.5,
+      tenureYears: 20,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle('Monthly Installment'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Estimated EMI',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${EmiUtils.formatEmi(emi)}/mo',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    _InfoChip(
+                      icon: Icons.trending_up_rounded,
+                      label: '8.5% p.a.',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Text(
+                  'Based on 20% down payment and 20 year tenure. Actual rates may vary by bank.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Map Section ──────────────────────────────────────────────────────────
+  Widget _buildMapSection(Property p) {
+    final pos = LatLng(p.latitude!, p.longitude!);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SectionTitle('Location on Map'),
+              GestureDetector(
+                onTap: () => context.push('/map', extra: p),
+                child: Text(
+                  'Full View',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 180,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: pos,
+                  initialZoom: 14,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.propvista',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: pos,
+                        width: 40,
+                        height: 40,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.home_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Reviews Section ───────────────────────────────────────────────────────
+  Widget _buildReviewsSection(Property p) {
+    final reviewsAsync = ref.watch(propertyReviewsProvider(p.id));
+    final avgRatingAsync = ref.watch(averageRatingProvider(p.id));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _SectionTitle('Ratings & Reviews'),
+              const Spacer(),
+              avgRatingAsync.maybeWhen(
+                data: (rating) => rating > 0
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.star_rounded,
+                                color: Colors.amber, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.amber[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(),
+                orElse: () => const SizedBox(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Add Review Form
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rate this property',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: List.generate(5, (i) {
+                    return GestureDetector(
+                      onTap: () => setState(() => _rating = i + 1),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.star_rounded,
+                          color: i < _rating ? Colors.amber : AppColors.textHint,
+                          size: 30,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _commentCtrl,
+                  maxLines: 2,
+                  style: GoogleFonts.inter(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Share your experience...',
+                    hintStyle: GoogleFonts.inter(color: AppColors.textHint),
+                    filled: true,
+                    fillColor: AppColors.surfaceAlt,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submitReview,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: _submittingReview
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Submit Review',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Reviews List
+          reviewsAsync.when(
+            data: (reviews) {
+              if (reviews.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No reviews yet. Be the first!',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                );
+              }
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reviews.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                itemBuilder: (_, i) {
+                  final r = reviews[i];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceAlt,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                r.userName.isNotEmpty ? r.userName[0].toUpperCase() : 'U',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                r.userName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Row(
+                                children: List.generate(5, (starIdx) {
+                                  return Icon(
+                                    Icons.star_rounded,
+                                    color: starIdx < r.rating
+                                        ? Colors.amber
+                                        : AppColors.textHint,
+                                    size: 14,
+                                  );
+                                }),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            FormatUtils.timeAgo(r.createdAt),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (r.comment != null) ...[
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 42),
+                          child: Text(
+                            r.comment!,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, __) => Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Center(
+                child: Text(
+                  'Error loading reviews: $err',
+                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.error),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Reusable small widgets ────────────────────────────────────────────────────
@@ -1021,6 +1525,8 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+
+
 class _ActionIconButton extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -1063,3 +1569,5 @@ class _ActionIconButton extends StatelessWidget {
     );
   }
 }
+
+

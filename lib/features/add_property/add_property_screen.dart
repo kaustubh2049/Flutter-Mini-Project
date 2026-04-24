@@ -9,6 +9,8 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/property_provider.dart';
 import '../../services/monetization_service.dart';
 import '../../services/property_service.dart';
+import '../../services/wallet_service.dart';
+import '../../core/utils/format_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Add Property flow is a 3-page PageView:
@@ -45,6 +47,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _localityCtrl = TextEditingController();
   final _cityCtrl = TextEditingController(text: 'Mumbai');
   final _stateCtrl = TextEditingController(text: 'Maharashtra');
+  final _latCtrl = TextEditingController();
+  final _lngCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _selectedAmenities = <String>{};
 
@@ -89,6 +93,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     _localityCtrl.dispose();
     _cityCtrl.dispose();
     _stateCtrl.dispose();
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -188,11 +194,26 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     setState(() => _submitting = true);
 
     try {
+      final priceStr =
+          _priceCtrl.text.replaceAll(',', '').replaceAll('₹', '').trim();
+      final price = double.tryParse(priceStr) ?? 0.0;
+      final brokerage = price * 0.005;
+
+      // 1. Check Wallet Balance
+      final balance = await WalletService.instance.getWalletBalance();
+      if (balance < brokerage) {
+        setState(() => _submitting = false);
+        _snack(
+            'Insufficient wallet balance. You need ${FormatUtils.formatPrice(brokerage)} to post this listing.');
+        return;
+      }
+
+      // 2. Add Property
       await PropertyService.instance.addProperty(
         title: _titleCtrl.text.trim(),
         type: _propertyType,
         listingType: _listingType,
-        price: double.parse(_priceCtrl.text.trim().replaceAll(',', '')),
+        price: price,
         bhk: _bhk != null ? int.tryParse(_bhk!.replaceAll('+', '')) : null,
         area: _areaCtrl.text.trim().isEmpty
             ? null
@@ -205,7 +226,13 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         amenities: _selectedAmenities.toList(),
         images: _images,
+        latitude: double.tryParse(_latCtrl.text.trim()),
+        longitude: double.tryParse(_lngCtrl.text.trim()),
+        brokerageAmount: brokerage,
       );
+
+      // 3. Deduct from Wallet
+      await WalletService.instance.deductMoney(brokerage, 'brokerage');
 
       // Invalidate feed so home screen refreshes
       ref.invalidate(homeFeedProvider);
@@ -649,6 +676,39 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               ),
             ],
           ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Latitude'),
+                    const SizedBox(height: 8),
+                    _InputField(
+                      controller: _latCtrl,
+                      hint: '19.0760',
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Longitude'),
+                    const SizedBox(height: 8),
+                    _InputField(
+                      controller: _lngCtrl,
+                      hint: '72.8777',
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           _FieldLabel('Description'),
           const SizedBox(height: 8),
@@ -824,6 +884,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               );
             },
           ),
+          const SizedBox(height: 24),
+          _buildBrokerageInfo(),
           const SizedBox(height: 20),
           if (_images.isEmpty)
             Container(
@@ -948,6 +1010,100 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     if (n >= 1000) return '₹${(n / 1000).toStringAsFixed(1)} K';
     return '₹$n';
   }
+
+  Widget _buildBrokerageInfo() {
+    final priceStr =
+        _priceCtrl.text.replaceAll(',', '').replaceAll('₹', '').trim();
+    final price = double.tryParse(priceStr) ?? 0.0;
+    final brokerage = price * 0.005;
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined,
+                      color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Brokerage Fees',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Platform Charge (0.5%)',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  Text(
+                    _formatPriceLabel(brokerage.round().toString()),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              FutureBuilder<double>(
+                future: WalletService.instance.getWalletBalance(),
+                builder: (context, snapshot) {
+                  final balance = snapshot.data ?? 0.0;
+                  final hasBalance = balance >= brokerage;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Your Wallet Balance:',
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        FormatUtils.formatPrice(balance),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: hasBalance ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Note: This brokerage is collected upfront. It will be refunded if your property remains unsold/unrented after 90 days.',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -988,7 +1144,7 @@ class _ToggleRow extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    opt,
+                    opt == 'Buy' ? 'Sell' : opt,
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,

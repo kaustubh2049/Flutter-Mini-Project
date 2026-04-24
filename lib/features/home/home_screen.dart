@@ -976,6 +976,50 @@ class _MyListingCard extends ConsumerStatefulWidget {
 }
 
 class _MyListingCardState extends ConsumerState<_MyListingCard> {
+  Future<void> _showDeleteConfirm(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Listing?',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        content: Text('This action cannot be undone. Are you sure?',
+            style: GoogleFonts.inter()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete',
+                style: GoogleFonts.inter(
+                    color: AppColors.error, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await PropertyService.instance.deleteProperty(widget.property.id);
+        ref.invalidate(homeFeedProvider);
+        ref.invalidate(myListingsProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Property deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.property;
@@ -1054,7 +1098,7 @@ class _MyListingCardState extends ConsumerState<_MyListingCard> {
                                 : AppColors.error,
                           ),
                           _MiniBadge(
-                            label: p.listingType,
+                            label: FormatUtils.listingTypeLabel(p.listingType),
                             color: AppColors.primary,
                           ),
                           if (p.isVerified)
@@ -1087,7 +1131,35 @@ class _MyListingCardState extends ConsumerState<_MyListingCard> {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
+                const Icon(Icons.chevron_right,
+                    size: 16, color: AppColors.primary),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () => _showDeleteConfirm(context, ref),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline_rounded,
+                            size: 14, color: AppColors.error),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Delete',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ],

@@ -153,6 +153,9 @@ class PropertyService {
     List<File> images = const [],
     String? ownerName,
     String? ownerPhone,
+    double? latitude,
+    double? longitude,
+    double brokerageAmount = 0.0,
   }) async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
@@ -193,6 +196,9 @@ class PropertyService {
       'is_active': true,
       'is_featured': false,
       'is_verified': false,
+      'latitude': latitude,
+      'longitude': longitude,
+      'brokerage_amount': brokerageAmount,
     };
 
     final result = await _db.from('properties').insert(row).select().single();
@@ -205,6 +211,10 @@ class PropertyService {
     await _db
         .from('properties')
         .update({'is_active': false}).eq('id', propertyId);
+  }
+
+  Future<void> deleteProperty(String propertyId) async {
+    await _db.from('properties').delete().eq('id', propertyId);
   }
 
   // ── Express interest ─────────────────────────────────────────────────────

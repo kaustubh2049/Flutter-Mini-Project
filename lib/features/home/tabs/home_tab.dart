@@ -137,25 +137,21 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               ],
             ),
           ),
-          Stack(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Icon(Icons.notifications_outlined,
-                    color: AppColors.textPrimary, size: 24),
+          // Map View Button
+          GestureDetector(
+            onTap: () => context.push('/map'),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                      color: AppColors.accent, shape: BoxShape.circle),
-                ),
-              ),
-            ],
+              child: const Icon(Icons.map_outlined,
+                  color: AppColors.primary, size: 22),
+            ),
           ),
+          
         ],
       ),
     );

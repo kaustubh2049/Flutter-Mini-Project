@@ -17,6 +17,7 @@ import 'features/seller/verification_request_screen.dart';
 import 'features/seller/subscription_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/wallet/wallet_screen.dart';
+import 'features/map/map_screen.dart';
 import 'models/property.dart';
 import 'providers/monetization_provider.dart';
 import 'providers/property_provider.dart';
@@ -94,6 +95,13 @@ final _router = GoRouter(
     GoRoute(
       path: '/subscription',
       builder: (context, state) => const SubscriptionScreen(),
+    ),
+    GoRoute(
+      path: '/map',
+      builder: (context, state) {
+        final p = state.extra as Property?;
+        return MapScreen(property: p);
+      },
     ),
   ],
 );

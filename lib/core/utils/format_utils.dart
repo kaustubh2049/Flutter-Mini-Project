@@ -21,6 +21,9 @@ class FormatUtils {
   static String priceSuffix(String listingType) =>
       listingType == 'Rent' ? '/mo' : '';
 
+  /// Returns display label for listing type
+  static String listingTypeLabel(String type) => type == 'Buy' ? 'Sell' : type;
+
   /// BHK label: null → 'PG/Studio'
   static String bhkLabel(int? bhk) =>
       bhk != null ? '$bhk BHK' : 'Studio/PG';

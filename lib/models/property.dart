@@ -22,7 +22,10 @@ class Property {
   final DateTime? boostExpiry;
   final bool isActive;
   final DateTime postedAt;
+  final double? latitude;
+  final double? longitude;
   final String ownerPlanType;
+  final double brokerageAmount;
 
   const Property({
     required this.id,
@@ -49,6 +52,9 @@ class Property {
     this.isActive = true,
     required this.postedAt,
     this.ownerPlanType = 'free',
+    this.latitude,
+    this.longitude,
+    this.brokerageAmount = 0.0,
   });
 
   bool get isBoostActive {
@@ -89,6 +95,9 @@ class Property {
       ownerPlanType: map['owner'] != null 
           ? (map['owner'] as Map<String, dynamic>)['plan_type']?.toString() ?? 'free'
           : 'free',
+      latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
+      longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
+      brokerageAmount: map['brokerage_amount'] != null ? (map['brokerage_amount'] as num).toDouble() : 0.0,
     );
   }
 }
