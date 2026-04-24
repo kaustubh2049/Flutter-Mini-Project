@@ -382,7 +382,7 @@ class _VerificationRequestScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  request.status.name.toUpperCase(),
+                  request.status.toString().split('.').last.toUpperCase(),
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,

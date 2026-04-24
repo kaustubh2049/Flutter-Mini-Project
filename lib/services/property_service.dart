@@ -19,7 +19,7 @@ class PropertyService {
   }) async {
     final uid = _db.auth.currentUser?.id;
 
-    var query = _db.from('properties').select().eq('is_active', true);
+    var query = _db.from('properties').select('*, owner:profiles(plan_type)').eq('is_active', true);
 
     // Exclude own posts
     if (uid != null) {
@@ -40,7 +40,7 @@ class PropertyService {
         .limit(limit);
 
     final properties = (data as List).map((m) => Property.fromMap(m)).toList();
-    _sortByBoostPriority(properties);
+    _sortByPlanPriority(properties);
     return properties;
   }
 
@@ -50,7 +50,7 @@ class PropertyService {
 
     var query = _db
         .from('properties')
-        .select()
+        .select('*, owner:profiles(plan_type)')
         .eq('is_featured', true)
         .eq('is_active', true);
 
@@ -61,7 +61,7 @@ class PropertyService {
         .order('posted_at', ascending: false)
         .limit(8);
     final properties = (data as List).map((m) => Property.fromMap(m)).toList();
-    _sortByBoostPriority(properties);
+    _sortByPlanPriority(properties);
     return properties.take(5).toList();
   }
 
@@ -72,12 +72,12 @@ class PropertyService {
 
     final data = await _db
         .from('properties')
-        .select()
+        .select('*, owner:profiles(plan_type)')
         .eq('owner_id', uid)
         .order('posted_at', ascending: false);
 
     final properties = (data as List).map((m) => Property.fromMap(m)).toList();
-    _sortByBoostPriority(properties);
+    _sortByPlanPriority(properties);
     return properties;
   }
 
@@ -113,13 +113,27 @@ class PropertyService {
     }).eq('id', propertyId);
   }
 
-  void _sortByBoostPriority(List<Property> properties) {
+  void _sortByPlanPriority(List<Property> properties) {
     properties.sort((a, b) {
-      final boostCompare =
-          (b.isBoostActive ? 1 : 0) - (a.isBoostActive ? 1 : 0);
-      if (boostCompare != 0) return boostCompare;
+      // Priority: Elite (3) > Pro (2) > Free (1)
+      final aPriority = _getPriority(a.ownerPlanType);
+      final bPriority = _getPriority(b.ownerPlanType);
+      
+      if (bPriority != aPriority) {
+        return bPriority.compareTo(aPriority); // Higher priority first
+      }
+      
+      // Secondary sort: Recency
       return b.postedAt.compareTo(a.postedAt);
     });
+  }
+
+  int _getPriority(String planType) {
+    switch (planType.toLowerCase()) {
+      case 'elite': return 3;
+      case 'pro': return 2;
+      default: return 1;
+    }
   }
 
   // ── Add a new property (with image upload) ───────────────────────────────
@@ -335,7 +349,7 @@ class PropertyService {
     // Join saved_properties → properties
     final data = await _db
         .from('saved_properties')
-        .select('properties(*)')
+        .select('properties(*, owner:profiles(plan_type))')
         .eq('user_id', uid)
         .order('saved_at', ascending: false);
 

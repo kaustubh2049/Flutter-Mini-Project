@@ -443,7 +443,7 @@ class _InquiryCard extends ConsumerWidget {
                   onTap: () async {
                     final chatId = await ref.read(chatServiceProvider).getOrCreateConversation(
                           buyerId: inquiry.userId,
-                          sellerId: property.ownerId,
+                          sellerId: property.ownerId ?? '',
                           propertyId: property.id,
                         );
                     if (context.mounted) {

@@ -4,94 +4,59 @@ class ChatService {
   ChatService._();
   static final instance = ChatService._();
 
-  final _db = Supabase.instance.client;
-  String? _messageColumnCache;
+  final SupabaseClient _db = Supabase.instance.client;
 
-  // ── Get or create a conversation between buyer & seller for a property ────
+  /// Find or create a conversation between buyer and seller for a property
   Future<String> getOrCreateConversation({
     required String buyerId,
     required String sellerId,
     required String propertyId,
   }) async {
-    // Check if conversation already exists
+    // 1. Check if exists
     final existing = await _db
         .from('conversations')
-        .select('id')
+        .select()
         .eq('buyer_id', buyerId)
         .eq('seller_id', sellerId)
         .eq('property_id', propertyId)
         .maybeSingle();
 
-    if (existing != null) {
-      return existing['id'] as String;
-    }
+    if (existing != null) return existing['id'];
 
-    // Create a new conversation
-    final result = await _db
+    // 2. Create new
+    final row = await _db
         .from('conversations')
         .insert({
           'buyer_id': buyerId,
           'seller_id': sellerId,
           'property_id': propertyId,
         })
-        .select('id')
+        .select()
         .single();
 
-    return result['id'] as String;
+    return row['id'];
   }
 
-  // ── Send a message ────────────────────────────────────────────────────────
+  /// Send a message in a conversation
   Future<void> sendMessage({
     required String conversationId,
     required String senderId,
     required String message,
   }) async {
-    final basePayload = {
+    await _db.from('messages').insert({
       'conversation_id': conversationId,
       'sender_id': senderId,
-    };
+      'message': message,
+    });
 
-    final candidateColumns = <String>[
-      if (_messageColumnCache != null) _messageColumnCache!,
-      'content',
-      'message',
-      'text',
-    ].toSet().toList();
-
-    PostgrestException? missingColumnError;
-
-    for (final column in candidateColumns) {
-      try {
-        final Map<String, dynamic> data = {...basePayload};
-        data[column] = message;
-        await _db.from('messages').insert(data);
-        _messageColumnCache = column;
-        return;
-      } on PostgrestException catch (e) {
-        if (_isMissingColumnError(e, column)) {
-          missingColumnError = e;
-          continue;
-        }
-        rethrow;
-      }
-    }
-
-    if (missingColumnError != null) {
-      throw missingColumnError;
-    }
-
-    throw Exception('Could not determine messages text column.');
+    // Update conversation timestamp
+    await _db
+        .from('conversations')
+        .update({'updated_at': DateTime.now().toIso8601String()}).eq(
+            'id', conversationId);
   }
 
-  bool _isMissingColumnError(PostgrestException error, String columnName) {
-    final details =
-        '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
-            .toLowerCase();
-    return details.contains('column') &&
-        details.contains(columnName.toLowerCase());
-  }
-
-  // ── Stream messages in realtime ───────────────────────────────────────────
+  /// Stream messages for a specific conversation
   Stream<List<Map<String, dynamic>>> getMessages(String conversationId) {
     return _db
         .from('messages')
@@ -105,13 +70,25 @@ class ChatService {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return [];
 
-    // Fetch where user is either buyer or seller
+    // Fetch where user is either buyer or seller, including profile names
     final response = await _db
         .from('conversations')
-        .select('*, properties(title, image_urls)')
+        .select(
+            '*, properties(title, image_urls), buyer:profiles!buyer_id(name), seller:profiles!seller_id(name)')
         .or('buyer_id.eq.$uid,seller_id.eq.$uid')
         .order('created_at', ascending: false);
 
     return response as List<Map<String, dynamic>>;
+  }
+
+  Future<Map<String, dynamic>?> getConversationDetails(
+      String conversationId) async {
+    final response = await _db
+        .from('conversations')
+        .select(
+            '*, properties(title), buyer:profiles!buyer_id(name), seller:profiles!seller_id(name)')
+        .eq('id', conversationId)
+        .maybeSingle();
+    return response;
   }
 }

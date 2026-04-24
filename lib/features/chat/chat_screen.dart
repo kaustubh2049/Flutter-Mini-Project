@@ -93,13 +93,28 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          'Chat',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+        title: FutureBuilder<Map<String, dynamic>?>(
+          future: _chatService.getConversationDetails(widget.conversationId),
+          builder: (context, snapshot) {
+            String title = 'Chat';
+            if (snapshot.hasData && snapshot.data != null) {
+              final conv = snapshot.data!;
+              final isBuyer = conv['buyer_id'] == _currentUserId;
+              final buyer = conv['buyer'] as Map?;
+              final seller = conv['seller'] as Map?;
+              title = isBuyer
+                  ? (seller?['name'] ?? 'Seller')
+                  : (buyer?['name'] ?? 'Buyer');
+            }
+            return Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            );
+          },
         ),
         centerTitle: true,
       ),

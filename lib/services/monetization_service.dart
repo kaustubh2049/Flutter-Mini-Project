@@ -1,16 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'property_service.dart';
+import 'wallet_service.dart';
 
 class PlanInfo {
   final String type;
   final String label;
   final int? listingLimit;
+  final double price;
 
   const PlanInfo({
     required this.type,
     required this.label,
     required this.listingLimit,
+    required this.price,
   });
 
   bool get isUnlimited => listingLimit == null;
@@ -45,10 +48,13 @@ class MonetizationService {
 
   final SupabaseClient _db = Supabase.instance.client;
 
+  static const double BOOST_PRICE = 199.0;
+  static const double VERIFICATION_PRICE = 200.0;
+
   static const Map<String, PlanInfo> _plans = {
-    'free': PlanInfo(type: 'free', label: 'Free', listingLimit: 3),
-    'pro': PlanInfo(type: 'pro', label: 'Pro', listingLimit: 25),
-    'elite': PlanInfo(type: 'elite', label: 'Elite', listingLimit: null),
+    'free': PlanInfo(type: 'free', label: 'Free', listingLimit: 3, price: 0),
+    'pro': PlanInfo(type: 'pro', label: 'Pro', listingLimit: 10, price: 499),
+    'elite': PlanInfo(type: 'elite', label: 'Elite', listingLimit: null, price: 999),
   };
 
   PlanInfo getPlanInfo(String? planType) {
@@ -104,14 +110,45 @@ class MonetizationService {
     String propertyId, {
     Duration duration = const Duration(days: 7),
   }) async {
+    // 1. Deduct from wallet
+    await WalletService.instance.deductMoney(BOOST_PRICE, 'boost');
+
+    // 2. Perform boost
     await PropertyService.instance
         .boostProperty(propertyId, duration: duration);
   }
 
+  Future<void> upgradePlan(String planType) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) throw Exception('Please log in');
+
+    final plan = _plans[planType.toLowerCase()];
+    if (plan == null) throw Exception('Invalid plan type');
+
+    // 1. Deduct from wallet
+    if (plan.price > 0) {
+      await WalletService.instance.deductMoney(plan.price, 'subscription');
+    }
+
+    // 2. Upsert profile (Update if exists, Insert if missing)
+    try {
+      await _db.from('profiles').upsert({
+        'id': uid,
+        'email': _db.auth.currentUser?.email,
+        'plan_type': plan.type,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      throw Exception('Could not update your plan: $e');
+    }
+  }
+
+  List<PlanInfo> getAllPlans() => _plans.values.where((p) => p.type != 'free').toList();
+
   Future<String> createBoostPaymentIntentPlaceholder({
     required String propertyId,
   }) async {
-    return 'TODO: integrate payment gateway for property $propertyId';
+    return '₹$BOOST_PRICE will be deducted from your wallet';
   }
 
   String _normalizePlan(String? planType) {

@@ -10,6 +10,8 @@ import '../../providers/monetization_provider.dart';
 import '../../providers/property_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/wallet_provider.dart';
+import '../../services/wallet_service.dart';
 import '../../core/utils/format_utils.dart';
 import '../../models/property.dart';
 import '../../models/verification_request.dart';
@@ -528,7 +530,17 @@ class _InboxTab extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final conv = conversations[index];
                 final prop = conv['properties'] as Map<String, dynamic>?;
-                final title = prop?['title'] as String? ?? 'Inquiry';
+                final buyer = conv['buyer'] as Map<String, dynamic>?;
+                final seller = conv['seller'] as Map<String, dynamic>?;
+                
+                final currentUid = Supabase.instance.client.auth.currentUser?.id;
+                final isBuyer = conv['buyer_id'] == currentUid;
+                
+                final otherName = isBuyer 
+                  ? (seller?['name'] ?? 'Seller')
+                  : (buyer?['name'] ?? 'Buyer');
+                
+                final propertyTitle = prop?['title'] as String? ?? 'Property Inquiry';
                 final images = prop?['image_urls'] as List?;
                 final img = (images != null && images.isNotEmpty) ? images.first : null;
 
@@ -537,10 +549,10 @@ class _InboxTab extends ConsumerWidget {
                   leading: CircleAvatar(
                     backgroundColor: AppColors.surfaceAlt,
                     backgroundImage: img != null ? NetworkImage(img) : null,
-                    child: img == null ? const Icon(Icons.home, color: AppColors.textSecondary) : null,
+                    child: img == null ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
                   ),
                   title: Text(
-                    title,
+                    otherName,
                     style: GoogleFonts.inter(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
@@ -548,7 +560,9 @@ class _InboxTab extends ConsumerWidget {
                     ),
                   ),
                   subtitle: Text(
-                    'Tap to view messages',
+                    propertyTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -578,6 +592,7 @@ class _ProfileTab extends ConsumerWidget {
     final name = user?.userMetadata?['name'] as String? ?? 'User';
     final email = user?.email ?? '';
     final planUsageAsync = ref.watch(planUsageProvider);
+    final walletBalanceAsync = ref.watch(walletBalanceProvider);
     final verificationAsync = ref.watch(myVerificationRequestsProvider);
     final myListingsAsync = ref.watch(myListingsProvider);
 
@@ -585,21 +600,41 @@ class _ProfileTab extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
       child: Column(
         children: [
-          // Avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: const BoxDecoration(
-                color: AppColors.primary, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-              style: GoogleFonts.inter(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+          // Header Row with Wallet
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SizedBox(width: 48), // Spacer
+              // Avatar
+              Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                    color: AppColors.primary, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                  style: GoogleFonts.inter(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
+              // Wallet Icon
+              GestureDetector(
+                onTap: () => context.push('/wallet'),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.account_balance_wallet_outlined,
+                      color: AppColors.primary),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Text(name,
@@ -611,12 +646,27 @@ class _ProfileTab extends ConsumerWidget {
           Text(email,
               style: GoogleFonts.inter(
                   fontSize: 13, color: AppColors.textSecondary)),
+          const SizedBox(height: 10),
+          // Quick Balance Display
+          walletBalanceAsync.when(
+            data: (balance) => Text(
+              'Wallet: ₹${balance.toStringAsFixed(0)}',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
           const SizedBox(height: 18),
 
           _SellerOverviewCard(
             planUsageAsync: planUsageAsync,
             verificationAsync: verificationAsync,
             onRequestVerification: () => context.push('/verification-request'),
+            onUpgrade: () => context.push('/subscription'),
           ),
           const SizedBox(height: 32),
 
@@ -678,6 +728,14 @@ class _ProfileTab extends ConsumerWidget {
           GestureDetector(
             onTap: () async {
               await ref.read(authServiceProvider).signOut();
+              
+              // Reset providers to prevent data leaking to next user session
+              ref.invalidate(walletBalanceProvider);
+              ref.invalidate(walletTransactionsProvider);
+              ref.invalidate(planUsageProvider);
+              ref.invalidate(myListingsProvider);
+              ref.invalidate(myVerificationRequestsProvider);
+              
               if (context.mounted) context.go('/');
             },
             child: Container(
@@ -713,11 +771,13 @@ class _SellerOverviewCard extends StatelessWidget {
   final AsyncValue<PlanUsage> planUsageAsync;
   final AsyncValue<List<VerificationRequest>> verificationAsync;
   final VoidCallback onRequestVerification;
+  final VoidCallback onUpgrade;
 
   const _SellerOverviewCard({
     required this.planUsageAsync,
     required this.verificationAsync,
     required this.onRequestVerification,
+    required this.onUpgrade,
   });
 
   @override
@@ -809,7 +869,7 @@ class _SellerOverviewCard extends StatelessWidget {
               }
 
               final latest = requests.first;
-              final status = latest.status.name;
+              final status = latest.status.toString().split('.').last;
               final color = status == 'approved'
                   ? AppColors.success
                   : status == 'rejected'
@@ -861,7 +921,7 @@ class _SellerOverviewCard extends StatelessWidget {
               onPressed: onRequestVerification,
               icon: const Icon(Icons.verified_user_outlined, size: 18),
               label: Text(
-                'Upload Documents For Verification',
+                'Verify Property (₹200)',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -870,6 +930,29 @@ class _SellerOverviewCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onUpgrade,
+              icon: const Icon(Icons.star_outline_rounded, size: 18),
+              label: Text(
+                'Upgrade Plan',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -893,50 +976,6 @@ class _MyListingCard extends ConsumerStatefulWidget {
 }
 
 class _MyListingCardState extends ConsumerState<_MyListingCard> {
-  bool _boosting = false;
-
-  Future<void> _boostListing() async {
-    if (_boosting) return;
-    setState(() => _boosting = true);
-    try {
-      await ref.read(monetizationServiceProvider).boostListing(
-            widget.property.id,
-            duration: const Duration(days: 7),
-          );
-      ref.invalidate(myListingsProvider);
-      ref.invalidate(homeFeedProvider);
-      ref.invalidate(featuredProvider);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Listing boosted for 7 days.',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.toString(),
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _boosting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = widget.property;
@@ -1018,16 +1057,6 @@ class _MyListingCardState extends ConsumerState<_MyListingCard> {
                             label: p.listingType,
                             color: AppColors.primary,
                           ),
-                          if (p.isFeatured)
-                            const _MiniBadge(
-                              label: 'Featured',
-                              color: AppColors.accent,
-                            ),
-                          if (p.isBoostActive)
-                            const _MiniBadge(
-                              label: 'Boosted',
-                              color: AppColors.warning,
-                            ),
                           if (p.isVerified)
                             const _MiniBadge(
                               label: 'Verified',
@@ -1035,16 +1064,6 @@ class _MyListingCardState extends ConsumerState<_MyListingCard> {
                             ),
                         ],
                       ),
-                      if (p.isBoostActive && p.boostExpiry != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Boost expiry: ${_dateLabel(p.boostExpiry!)}',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1068,48 +1087,13 @@ class _MyListingCardState extends ConsumerState<_MyListingCard> {
                   ),
                 ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: _boosting ? null : _boostListing,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: AppColors.warning.withOpacity(0.4)),
-                    ),
-                    child: _boosting
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.8,
-                              color: AppColors.warning,
-                            ),
-                          )
-                        : Text(
-                            p.isBoostActive ? 'Extend Boost' : 'Boost Listing',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.warning,
-                            ),
-                          ),
-                  ),
-                ),
+                const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
               ],
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _dateLabel(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month/${date.year}';
   }
 }
 

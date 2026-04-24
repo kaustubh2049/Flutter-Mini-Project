@@ -22,6 +22,7 @@ class Property {
   final DateTime? boostExpiry;
   final bool isActive;
   final DateTime postedAt;
+  final String ownerPlanType;
 
   const Property({
     required this.id,
@@ -47,6 +48,7 @@ class Property {
     this.boostExpiry,
     this.isActive = true,
     required this.postedAt,
+    this.ownerPlanType = 'free',
   });
 
   bool get isBoostActive {
@@ -84,6 +86,9 @@ class Property {
       postedAt: DateTime.parse(
         map['posted_at'] ?? DateTime.now().toIso8601String(),
       ),
+      ownerPlanType: map['owner'] != null 
+          ? (map['owner'] as Map<String, dynamic>)['plan_type']?.toString() ?? 'free'
+          : 'free',
     );
   }
 }

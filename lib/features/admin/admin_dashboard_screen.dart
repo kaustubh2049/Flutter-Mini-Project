@@ -191,7 +191,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Status updated to ${status.name}'),
+            content: Text('Status updated to ${status.toString().split('.').last}'),
             backgroundColor: status == VerificationStatus.approved
                 ? AppColors.success
                 : AppColors.error,
@@ -341,7 +341,7 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.5)),
       ),
       child: Text(
-        status.name.toUpperCase(),
+        status.toString().split('.').last.toUpperCase(),
         style: GoogleFonts.inter(
           fontSize: 10,
           fontWeight: FontWeight.w700,

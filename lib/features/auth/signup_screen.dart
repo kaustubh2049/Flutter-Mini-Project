@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 
@@ -70,20 +71,30 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMsg = _parseError(e.toString());
+        _errorMsg = _parseError(e);
         _isLoading = false;
       });
     }
   }
 
-  String _parseError(String e) {
-    if (e.contains('User already registered')) {
+  String _parseError(Object e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('user already registered')) {
       return 'An account with this email already exists.';
     }
-    if (e.contains('Password should be at least')) {
+    if (msg.contains('password should be at least')) {
       return 'Password must be at least 6 characters.';
     }
-    return 'Something went wrong. Please try again.';
+    if (msg.contains('network') || msg.contains('failed host lookup')) {
+      return 'Network error. Please check your connection.';
+    }
+    
+    // Return the actual error message if it's an AuthException
+    if (e is AuthException) {
+      return e.message;
+    }
+    
+    return 'Signup failed: ${e.toString()}';
   }
 
   @override

@@ -14,7 +14,9 @@ import 'features/property_detail/property_detail_screen.dart';
 import 'features/inquiries/property_inquiries_screen.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/seller/verification_request_screen.dart';
+import 'features/seller/subscription_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
+import 'features/wallet/wallet_screen.dart';
 import 'models/property.dart';
 import 'providers/monetization_provider.dart';
 import 'providers/property_provider.dart';
@@ -84,6 +86,14 @@ final _router = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/wallet',
+      builder: (context, state) => const WalletScreen(),
+    ),
+    GoRoute(
+      path: '/subscription',
+      builder: (context, state) => const SubscriptionScreen(),
     ),
   ],
 );
